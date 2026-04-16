@@ -10,7 +10,7 @@ const CONFIG = {
   TENANT_ID: 'VOTRE_TENANT_ID',    // Directory (tenant) ID dans Azure AD
 
   // ── Hébergement ───────────────────────────────────────────────────────────
-  APP_URL: 'https://YOUR_GITHUB_USERNAME.github.io/presences-blackip360-dev',
+  APP_URL: 'https://blackip360tech.github.io/presences-blackip360-dev',
 
   // ── SharePoint ────────────────────────────────────────────────────────────
   SHAREPOINT_HOST:      'blackip360.sharepoint.com',
