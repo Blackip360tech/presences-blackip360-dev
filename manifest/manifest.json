@@ -1,0 +1,68 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.16",
+  "version": "1.0.0",
+  "id": "a9f2c3d4-e5b6-47f8-9a0b-1c2d3e4f5a6b",
+  "packageName": "com.blackip360.presences",
+
+  "developer": {
+    "name": "BlackIP360",
+    "websiteUrl": "https://blackip360.com",
+    "privacyUrl": "https://blackip360.com/privacy",
+    "termsOfUseUrl": "https://blackip360.com/terms"
+  },
+
+  "name": {
+    "short": "Présences",
+    "full": "BlackIP360 — Présences"
+  },
+
+  "description": {
+    "short": "Gestion des présences employés",
+    "full": "Système de gestion des présences pour les 31+ employés de BlackIP360. Pointage en temps réel, affichage TV, analyse paye."
+  },
+
+  "icons": {
+    "outline": "outline.png",
+    "color": "color.png"
+  },
+
+  "accentColor": "#0078D4",
+
+  "staticTabs": [
+    {
+      "entityId": "monStatut",
+      "name": "Mon Statut",
+      "contentUrl": "https://YOUR_GITHUB_USERNAME.github.io/presences-blackip360/?tab=statut",
+      "websiteUrl": "https://YOUR_GITHUB_USERNAME.github.io/presences-blackip360/",
+      "scopes": ["personal"]
+    },
+    {
+      "entityId": "adminView",
+      "name": "Admin",
+      "contentUrl": "https://YOUR_GITHUB_USERNAME.github.io/presences-blackip360/?tab=admin",
+      "websiteUrl": "https://YOUR_GITHUB_USERNAME.github.io/presences-blackip360/",
+      "scopes": ["personal"]
+    },
+    {
+      "entityId": "tvDisplay",
+      "name": "Affichage TV",
+      "contentUrl": "https://YOUR_GITHUB_USERNAME.github.io/presences-blackip360/?tab=tv",
+      "websiteUrl": "https://YOUR_GITHUB_USERNAME.github.io/presences-blackip360/",
+      "scopes": ["personal"]
+    }
+  ],
+
+  "permissions": ["identity", "messageTeamMembers"],
+
+  "validDomains": [
+    "YOUR_GITHUB_USERNAME.github.io",
+    "login.microsoftonline.com",
+    "blackip360.sharepoint.com"
+  ],
+
+  "webApplicationInfo": {
+    "id": "VOTRE_CLIENT_ID",
+    "resource": "https://graph.microsoft.com"
+  }
+}

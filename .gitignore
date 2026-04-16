@@ -1,0 +1,13 @@
+# Secrets locaux - ne jamais committer
+*.env
+*.local
+secrets.js
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Éditeurs
+.vscode/settings.json
+*.suo
+*.user

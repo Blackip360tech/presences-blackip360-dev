@@ -1,0 +1,52 @@
+// BlackIP360 Présences — Configuration
+// ⚠️  ACTION REQUISE avant déploiement : remplacer CLIENT_ID et TENANT_ID
+//     Voir : https://portal.azure.com → Azure Active Directory → App registrations
+
+const CONFIG = {
+
+  // ── Azure AD ──────────────────────────────────────────────────────────────
+  CLIENT_ID: 'VOTRE_CLIENT_ID',    // Application (client) ID dans Azure AD
+  TENANT_ID: 'VOTRE_TENANT_ID',    // Directory (tenant) ID dans Azure AD
+
+  // ── Hébergement ───────────────────────────────────────────────────────────
+  APP_URL: 'https://YOUR_GITHUB_USERNAME.github.io/presences-blackip360',
+
+  // ── SharePoint ────────────────────────────────────────────────────────────
+  SHAREPOINT_HOST:      'blackip360.sharepoint.com',
+  SHAREPOINT_SITE_PATH: '/sites/PlanificationTI',
+  SHAREPOINT_LIST:      'Presences_Employes',
+
+  // ── Graph API ─────────────────────────────────────────────────────────────
+  GRAPH_BASE: 'https://graph.microsoft.com/v1.0',
+  SCOPES: ['User.Read', 'Sites.ReadWrite.All'],
+
+  // ── Teams ─────────────────────────────────────────────────────────────────
+  TEAMS_ID: '667ef628-228c-4459-93fa-73fce99a58f7',
+
+  // ── UI ────────────────────────────────────────────────────────────────────
+  TV_REFRESH_MS: 30000,
+
+  DEPARTEMENTS: [
+    'Tous',
+    'Direction',
+    'Développement',
+    'Infrastructure',
+    'Support',
+    'Administration',
+  ],
+
+  // 11 statuts personnalisés BlackIP360
+  STATUTS: [
+    { id: 'bureau',      label: 'Je suis là au bureau',                      icon: '🏢', color: '#198754', category: 'present' },
+    { id: 'teletravail', label: 'Je suis là en télétravail',                 icon: '🏠', color: '#0dcaf0', category: 'present' },
+    { id: 'route_bip',   label: 'Client BlackIP360 - Je suis sur la route',  icon: '🚗', color: '#fd7e14', category: 'present' },
+    { id: 'route_cv247', label: 'Client CV247/EMG - Je suis sur la route',   icon: '🛣️', color: '#d63384', category: 'present' },
+    { id: 'formation',   label: 'En formation 👩🏻‍💻🎧👨🏻‍🎓',                  icon: '📚', color: '#6f42c1', category: 'present' },
+    { id: 'quart_fini',  label: 'Quart de travail terminé',                  icon: '✅', color: '#6c757d', category: 'absent'  },
+    { id: 'rdv_perso',   label: 'Parti pour un rendez-vous personnel',       icon: '📅', color: '#20c997', category: 'absent'  },
+    { id: 'pause',       label: 'Parti en pause ☕',                         icon: '☕', color: '#795548', category: 'absent'  },
+    { id: 'diner',       label: 'Parti en dîner 🍽️',                        icon: '🍽️', color: '#ff9800', category: 'absent'  },
+    { id: 'vacances',    label: 'Parti en vacance 🌞🍺🍹😎',                icon: '🌞', color: '#ffc107', category: 'absent'  },
+    { id: 'malade',      label: 'Je suis Malade 🤒🤧😷',                    icon: '🤒', color: '#dc3545', category: 'absent'  },
+  ],
+};
