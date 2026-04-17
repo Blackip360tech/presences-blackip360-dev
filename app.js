@@ -78,6 +78,15 @@ const App = {
       console.warn('[APP] Graph.getProfile() échec:', err.message);
     }
 
+    // Département depuis Soldes_Conges (source de vérité si admin l'a assigné)
+    try {
+      const solde = await Graph.getSolde(this.user.email);
+      if (solde.departement) {
+        this.user.department = solde.departement;
+        console.log('[APP] département override Soldes:', solde.departement);
+      }
+    } catch (err) { /* pas bloquant */ }
+
     this._checkAdmin();
     this._showApp();
     this._renderHeader();
@@ -575,7 +584,15 @@ const App = {
     const el = document.getElementById('tab-admin');
     el.innerHTML = '<div class="loading">Chargement des présences…</div>';
     try {
-      this.currentStatuses = await Graph.getCurrentStatuses();
+      const [statuses, soldes] = await Promise.all([
+        Graph.getCurrentStatuses(),
+        Graph.getAllSoldes().catch(() => []),
+      ]);
+      const soldeMap = Object.fromEntries(soldes.map(s => [s.email?.toLowerCase(), s]));
+      this.currentStatuses = statuses.map(p => ({
+        ...p,
+        Departement: soldeMap[p.EmployeEmail?.toLowerCase()]?.departement || p.Departement,
+      }));
       el.innerHTML = this._renderAdmin(this.currentStatuses);
       this._bindAdminFilters();
     } catch (err) {
@@ -684,7 +701,7 @@ const App = {
     const jpT  = now.toLocaleTimeString('fr-CA', { timeZone: 'Asia/Tokyo',     hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
     const jpD  = now.toLocaleDateString('fr-CA', { timeZone: 'Asia/Tokyo',     weekday:'long', day:'numeric', month:'long', year:'numeric' });
     el.innerHTML = `
-      <div class="line-mtr"><span class="city">📍 Montréal</span> <span class="time">${mtrT}</span> <span class="date">${mtrD}</span></div>
+      <div class="line-mtr"><span class="city">🇨🇦 Montréal</span> <span class="time">${mtrT}</span> <span class="date">${mtrD}</span></div>
       <div class="line-jp"><span class="city">🇯🇵 Tokyo</span> <span class="time">${jpT}</span> <span class="date">${jpD}</span></div>
     `;
   },
@@ -692,8 +709,16 @@ const App = {
   async _refreshTV() {
     const el = document.getElementById('tab-tv');
     try {
-      const statuses = await Graph.getCurrentStatuses();
-      el.innerHTML   = this._renderTV(statuses);
+      const [statuses, soldes] = await Promise.all([
+        Graph.getCurrentStatuses(),
+        Graph.getAllSoldes().catch(() => []),
+      ]);
+      const soldeMap = Object.fromEntries(soldes.map(s => [s.email?.toLowerCase(), s]));
+      const enriched = statuses.map(p => ({
+        ...p,
+        Departement: soldeMap[p.EmployeEmail?.toLowerCase()]?.departement || p.Departement,
+      }));
+      el.innerHTML   = this._renderTV(enriched);
     } catch (err) {
       el.innerHTML = `<div class="error tv-error">Erreur : ${err.message}</div>`;
     }
@@ -1050,10 +1075,10 @@ const App = {
       const now = new Date();
       const mtrT = now.toLocaleTimeString('fr-CA', { timeZone: 'America/Toronto', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
       const mtrD = now.toLocaleDateString('fr-CA', { timeZone: 'America/Toronto', weekday:'short', day:'numeric', month:'short' });
-      const jpT  = now.toLocaleTimeString('fr-CA', { timeZone: 'Asia/Tokyo',     hour:'2-digit', minute:'2-digit', hour12:false });
+      const jpT  = now.toLocaleTimeString('fr-CA', { timeZone: 'Asia/Tokyo',     hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
       const jpD  = now.toLocaleDateString('fr-CA', { timeZone: 'Asia/Tokyo',     weekday:'short', day:'numeric', month:'short' });
       el.innerHTML = `
-        <div class="mtr">📍 Montréal · <b>${mtrT}</b> · ${mtrD}</div>
+        <div class="mtr">🇨🇦 Montréal · <b>${mtrT}</b> · ${mtrD}</div>
         <div class="jp">🇯🇵 Tokyo · <b>${jpT}</b> · ${jpD}</div>
       `;
     };
