@@ -629,6 +629,20 @@ const App = {
     return Math.round(m.total / 6) / 10; // arrondi à 0.1h près
   },
 
+  // Initialise un calendrier Flatpickr sur un champ date
+  _initDatePicker(id, onChange) {
+    const el = document.getElementById(id);
+    if (!el || typeof flatpickr === 'undefined') return;
+    flatpickr(el, {
+      locale:     'fr',
+      dateFormat: 'Y-m-d',
+      altInput:   true,
+      altFormat:  'D j F Y',
+      defaultDate: el.value || undefined,
+      onChange:   () => { if (typeof onChange === 'function') onChange(); },
+    });
+  },
+
   // ── MON RAPPORT ───────────────────────────────────────────────────────────
   _loadRapport() {
     const el = document.getElementById('tab-rapport');
@@ -714,13 +728,13 @@ const App = {
       };
     });
 
-    // Quand l'utilisateur change manuellement une date, désactiver les presets
-    ['rapFrom', 'rapTo'].forEach(id => {
-      document.getElementById(id).onchange = () => {
-        el.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-        this._computeRapport();
-      };
-    });
+    // Calendriers Flatpickr + auto-deselect des presets au changement manuel
+    const onDateChange = () => {
+      el.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      this._computeRapport();
+    };
+    this._initDatePicker('rapFrom', onDateChange);
+    this._initDatePicker('rapTo',   onDateChange);
 
     this._computeRapport();
   },
@@ -1201,13 +1215,13 @@ const App = {
       };
     });
 
-    // Quand l'utilisateur change manuellement une date, désactiver les presets
-    ['payeDateFrom', 'payeDateTo'].forEach(id => {
-      document.getElementById(id).onchange = () => {
-        el.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-        this._computePaye();
-      };
-    });
+    // Calendriers Flatpickr + auto-deselect des presets au changement manuel
+    const onDateChange = () => {
+      el.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      this._computePaye();
+    };
+    this._initDatePicker('payeDateFrom', onDateChange);
+    this._initDatePicker('payeDateTo',   onDateChange);
 
     this._computePaye();
   },

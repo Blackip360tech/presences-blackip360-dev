@@ -10,6 +10,12 @@
   <!-- MSAL.js 2.x (authentification Microsoft) -->
   <script src="https://alcdn.msauth.net/browser/2.35.0/js/msal-browser.min.js"></script>
 
+  <!-- Flatpickr — calendrier pour les sélecteurs de date -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/themes/dark.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/fr.js"></script>
+
   <style>
     /* ── Variables ──────────────────────────────────────────────────────── */
     :root {
@@ -688,6 +694,41 @@
     }
     .paye-legend span { display: inline-flex; align-items: center; gap: 8px; }
 
+    /* ── FLATPICKR (thème app) ──────────────────────────────────────────── */
+    .flatpickr-input[readonly] + input.flatpickr-input {
+      padding: 9px 12px;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: .88rem;
+      font-family: inherit;
+      width: 100%;
+      cursor: pointer;
+    }
+    .flatpickr-input[readonly] + input.flatpickr-input:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    .flatpickr-calendar.dark {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+    }
+    .flatpickr-calendar.dark .flatpickr-day.selected,
+    .flatpickr-calendar.dark .flatpickr-day.startRange,
+    .flatpickr-calendar.dark .flatpickr-day.endRange {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+    .flatpickr-calendar.dark .flatpickr-day.today {
+      border-color: var(--primary);
+    }
+    .flatpickr-calendar.dark .flatpickr-day:hover {
+      background: var(--surface-2);
+    }
+
     /* ── ACCÈS ──────────────────────────────────────────────────────────── */
     .acces-wrap { max-width: 1000px; margin: 0 auto; }
     .acces-card {
@@ -898,10 +939,10 @@
 <div id="toast"></div>
 
 <!-- Scripts (ordre important) -->
-<script src="config.js?v=30"></script>
-<script src="auth.js?v=30"></script>
-<script src="graph.js?v=30"></script>
-<script src="app.js?v=30"></script>
+<script src="config.js?v=31"></script>
+<script src="auth.js?v=31"></script>
+<script src="graph.js?v=31"></script>
+<script src="app.js?v=31"></script>
 
 </body>
 </html>
