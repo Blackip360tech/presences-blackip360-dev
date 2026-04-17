@@ -13,6 +13,7 @@ class GraphAPI {
       headers: {
         Authorization:  `Bearer ${token}`,
         'Content-Type': 'application/json',
+        'Prefer':       'HonorNonIndexedQueriesWarningMayFailRandomly',
         ...options.headers,
       },
     });
