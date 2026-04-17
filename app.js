@@ -1030,23 +1030,32 @@ const App = {
   // ── PAYE ──────────────────────────────────────────────────────────────────
   _loadPaye() {
     const el = document.getElementById('tab-paye');
-    const today = new Date();
-    const monday = new Date(today);
-    monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
+    const now = new Date();
     const fmt = d => d.toISOString().slice(0, 10);
+
+    // Presets de période
+    const today = new Date(now);
+    const monday = new Date(today); monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+    const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
 
     el.innerHTML = `
       <div class="paye-header">
         <div class="paye-title">
           <h2>💰 Rapport de paie</h2>
-          <div class="sub">Générez les données de paie pour la période choisie</div>
+          <div class="sub">Consultez les heures travaillées et les congés par employé</div>
         </div>
         <div class="paye-actions">
           <button class="btn-primary" id="payeExport">⬇ Exporter CSV</button>
           <button class="btn-secondary" id="payePrint">🖨 Imprimer</button>
         </div>
+      </div>
+
+      <div class="paye-presets">
+        <button class="preset-btn" data-preset="week">Cette semaine</button>
+        <button class="preset-btn" data-preset="lastweek">Semaine dernière</button>
+        <button class="preset-btn" data-preset="2weeks">Ces 2 semaines</button>
+        <button class="preset-btn" data-preset="month">Ce mois</button>
+        <button class="preset-btn" data-preset="lastmonth">Mois dernier</button>
       </div>
 
       <div class="paye-filters">
@@ -1065,8 +1074,12 @@ const App = {
           </select>
         </div>
         <div class="field">
-          <label>Action</label>
-          <button class="btn-primary" id="payeCalc">Générer le rapport</button>
+          <label>🔍 Rechercher</label>
+          <input type="text" id="payeSearch" placeholder="Nom ou email…">
+        </div>
+        <div class="field">
+          <label>&nbsp;</label>
+          <button class="btn-primary" id="payeCalc">Générer</button>
         </div>
       </div>
 
@@ -1075,7 +1088,40 @@ const App = {
 
     document.getElementById('payeCalc').onclick   = () => this._computePaye();
     document.getElementById('payeExport').onclick = () => this.exportPayeCSV();
-    document.getElementById('payePrint').onclick = () => window.print();
+    document.getElementById('payePrint').onclick  = () => window.print();
+    document.getElementById('payeSearch').oninput = () => this._filterPayeRows();
+    document.getElementById('payeDept').onchange  = () => this._computePaye();
+
+    el.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.onclick = () => {
+        const preset = btn.dataset.preset;
+        let from, to;
+        const n = new Date();
+        if (preset === 'week') {
+          from = new Date(n); from.setDate(n.getDate() - ((n.getDay() + 6) % 7));
+          to = new Date(from); to.setDate(from.getDate() + 6);
+        } else if (preset === 'lastweek') {
+          from = new Date(n); from.setDate(n.getDate() - ((n.getDay() + 6) % 7) - 7);
+          to = new Date(from); to.setDate(from.getDate() + 6);
+        } else if (preset === '2weeks') {
+          to = new Date(n); to.setDate(n.getDate() - ((n.getDay() + 6) % 7) - 1);
+          from = new Date(to); from.setDate(to.getDate() - 13);
+        } else if (preset === 'month') {
+          from = new Date(n.getFullYear(), n.getMonth(), 1);
+          to   = new Date(n.getFullYear(), n.getMonth() + 1, 0);
+        } else if (preset === 'lastmonth') {
+          from = new Date(n.getFullYear(), n.getMonth() - 1, 1);
+          to   = new Date(n.getFullYear(), n.getMonth(), 0);
+        }
+        document.getElementById('payeDateFrom').value = fmt(from);
+        document.getElementById('payeDateTo').value   = fmt(to);
+        el.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b === btn));
+        this._computePaye();
+      };
+    });
+
+    // Marquer "Cette semaine" comme actif par défaut
+    el.querySelector('[data-preset="week"]')?.classList.add('active');
 
     this._computePaye();
   },
@@ -1091,97 +1137,182 @@ const App = {
     const to   = new Date(toStr   + 'T23:59:59');
 
     try {
-      const all = await Graph.getAllPresences();
+      const [all, soldes, allDemandes] = await Promise.all([
+        Graph.getAllPresences(),
+        Graph.getAllSoldes().catch(() => []),
+        Graph.getAllDemandes().catch(() => []),
+      ]);
+      const soldeMap = Object.fromEntries(soldes.map(s => [s.email?.toLowerCase(), s]));
+
       const filtered = all.filter(p => {
         if (!p.HeurePointage) return false;
         const d = new Date(p.HeurePointage);
         if (d < from || d > to) return false;
-        if (dept !== 'Tous' && p.Departement !== dept) return false;
+        // Dept via soldes (source de vérité)
+        const effDept = soldeMap[p.EmployeEmail?.toLowerCase()]?.departement || p.Departement;
+        if (dept !== 'Tous' && effDept !== dept) return false;
         return true;
       });
 
+      // Grouper par employé
       const byEmp = {};
       for (const p of filtered) {
         const k = p.EmployeEmail || 'inconnu';
-        if (!byEmp[k]) byEmp[k] = { nom: p.EmployeNom, email: k, dept: p.Departement, entries: [] };
+        if (!byEmp[k]) {
+          const s = soldeMap[k.toLowerCase()] || {};
+          byEmp[k] = { nom: p.EmployeNom, email: k, dept: s.departement || p.Departement, entries: [] };
+        }
         byEmp[k].entries.push(p);
       }
+
+      // Ajouter aussi les employés qui ont un solde mais pas de pointage dans la période (s'ils matchent le dept)
+      for (const s of soldes) {
+        const k = s.email;
+        if (k && !byEmp[k]) {
+          if (dept !== 'Tous' && s.departement !== dept) continue;
+          byEmp[k] = { nom: s.nom, email: k, dept: s.departement, entries: [] };
+        }
+      }
+
       this._payeData = byEmp;
 
-      // Générer colonnes pour chaque jour de la période
+      // Jours de la période
       const days = [];
-      for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
-        days.push(new Date(d));
-      }
-      const dayLabels = days.map(d => d.toLocaleDateString('fr-CA', { weekday: 'short', day: 'numeric' }));
+      for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) days.push(new Date(d));
+      const isWeekend = d => d.getDay() === 0 || d.getDay() === 6;
 
-      // Calculer les heures par employé par jour
+      // Calculer par employé
       const rows = Object.values(byEmp).map(emp => {
         const byDay = {};
         for (const e of emp.entries) {
-          const dateKey = e.HeurePointage.slice(0, 10);
-          if (!byDay[dateKey]) byDay[dateKey] = [];
-          byDay[dateKey].push(e);
+          const k = e.HeurePointage.slice(0, 10);
+          if (!byDay[k]) byDay[k] = [];
+          byDay[k].push(e);
         }
-        const dayHours = days.map(d => {
+        const dayStates = days.map(d => {
           const key = d.toISOString().slice(0, 10);
           const entries = byDay[key] || [];
           const hasPresent = entries.some(e => CONFIG.STATUTS.find(s => s.label === e.StatutActuel)?.category === 'present');
-          return hasPresent ? 8 : 0;
+          const hasAbsent  = entries.some(e => CONFIG.STATUTS.find(s => s.label === e.StatutActuel)?.category === 'absent');
+          if (isWeekend(d))      return { type: 'weekend', hours: 0 };
+          if (hasPresent)        return { type: 'present', hours: 8 };
+          if (hasAbsent)         return { type: 'absent',  hours: 0 };
+          return { type: 'none', hours: 0 };
         });
-        const total = dayHours.reduce((a,b) => a+b, 0);
-        return { emp, dayHours, total };
-      });
+        const total = dayStates.reduce((s, x) => s + x.hours, 0);
 
-      rows.sort((a, b) => (a.emp.nom || '').localeCompare(b.emp.nom || ''));
+        // Congés pris dans la période (approuvés)
+        const congesApprouves = allDemandes.filter(d =>
+          d.EmployeEmail?.toLowerCase() === emp.email.toLowerCase() &&
+          d.Statut === 'Approuvée' &&
+          new Date(d.DateFin) >= from &&
+          new Date(d.DateDebut) <= to
+        );
+        const hVacPrises = congesApprouves.filter(d => d.TypeConge === 'Vacances').reduce((s, d) => s + (d.NombreHeures || 0), 0);
+        const hMalPrises = congesApprouves.filter(d => d.TypeConge === 'Maladie').reduce((s, d) => s + (d.NombreHeures || 0), 0);
+
+        const solde = soldeMap[emp.email.toLowerCase()] || { vacances: 0, maladie: 0 };
+
+        return { emp, dayStates, total, hVacPrises, hMalPrises, soldeVac: solde.vacances, soldeMal: solde.maladie };
+      }).sort((a, b) => (a.emp.nom || '').localeCompare(b.emp.nom || ''));
+
+      // Résumé global
+      const totalEmployes = rows.filter(r => r.total > 0).length;
+      const totalJours = rows.reduce((s, r) => s + r.dayStates.filter(x => x.type === 'present').length, 0);
+      const totalHeures = rows.reduce((s, r) => s + r.total, 0);
+      const totalCongesPris = rows.reduce((s, r) => s + r.hVacPrises + r.hMalPrises, 0);
+
+      // Header dates (pour la table)
+      const dayHeaders = days.map(d => {
+        const ws = d.toLocaleDateString('fr-CA', { weekday: 'short' }).replace('.', '');
+        const num = d.getDate();
+        return `<th class="day${isWeekend(d) ? ' day-we' : ''}"><div class="dh-ws">${ws}</div><div class="dh-num">${num}</div></th>`;
+      }).join('');
+
+      const rowsHTML = rows.map(r => {
+        const initials = (r.emp.nom || '?').split(' ').map(x => x[0]).slice(0,2).join('').toUpperCase();
+        const pills = r.dayStates.map(s => {
+          const cls = 'day-pill day-' + s.type;
+          const txt = s.type === 'present' ? '8' : s.type === 'absent' ? '·' : s.type === 'weekend' ? '' : '—';
+          return `<td class="day${s.type === 'weekend' ? ' day-we' : ''}"><span class="${cls}">${txt}</span></td>`;
+        }).join('');
+        return `
+          <tr data-search="${(r.emp.nom + ' ' + r.emp.email).toLowerCase()}">
+            <td class="emp-cell">
+              <div class="emp-avatar">${initials}</div>
+              <div>
+                <div class="emp-nom">${r.emp.nom || '—'}</div>
+                <div class="emp-dept muted">${r.emp.dept || '—'}</div>
+              </div>
+            </td>
+            ${pills}
+            <td class="day tot-cell">${r.total}<span class="muted" style="font-size:.72rem"> h</span></td>
+            <td class="day conge-cell">
+              <div class="conge-pris" title="Vacances prises">${r.hVacPrises}h</div>
+              <div class="conge-reste muted" title="Solde restant">reste ${r.soldeVac}h</div>
+            </td>
+            <td class="day conge-cell">
+              <div class="conge-pris" title="Maladie prises">${r.hMalPrises}h</div>
+              <div class="conge-reste muted" title="Solde restant">reste ${r.soldeMal}h</div>
+            </td>
+          </tr>`;
+      }).join('');
 
       // Totaux par jour
-      const totByDay = days.map((_, i) => rows.reduce((s, r) => s + r.dayHours[i], 0));
+      const totByDay = days.map((_, i) => rows.reduce((s, r) => s + r.dayStates[i].hours, 0));
       const grandTotal = totByDay.reduce((a,b) => a+b, 0);
 
-      const soldes = await Graph.getAllSoldes();
-      const soldeMap = Object.fromEntries(soldes.map(s => [s.email?.toLowerCase(), s]));
-
       result.innerHTML = `
-        <div class="table-wrap">
+        <div class="stat-row" style="margin-bottom:20px">
+          <div class="stat-card blue"><div class="stat-l">Employés actifs</div><div class="stat-n">${totalEmployes}</div></div>
+          <div class="stat-card green"><div class="stat-l">Jours travaillés</div><div class="stat-n">${totalJours}</div></div>
+          <div class="stat-card yellow"><div class="stat-l">Heures totales</div><div class="stat-n">${totalHeures}</div></div>
+          <div class="stat-card purple"><div class="stat-l">Congés pris (h)</div><div class="stat-n">${totalCongesPris}</div></div>
+        </div>
+
+        <div class="table-wrap paye-table-wrap">
           <table class="paye-table">
             <thead>
               <tr>
-                <th>Employé</th><th>Dept</th>
-                ${dayLabels.map(l => `<th class="day">${l}</th>`).join('')}
+                <th class="emp-col">Employé</th>
+                ${dayHeaders}
                 <th class="day">Total</th>
                 <th class="day">🌴 Vac.</th>
                 <th class="day">🤒 Mal.</th>
               </tr>
             </thead>
-            <tbody>
-              ${rows.map(r => {
-                const so = soldeMap[r.emp.email?.toLowerCase()] || { vacances: 0, maladie: 0 };
-                return `
-                <tr>
-                  <td><strong>${r.emp.nom || '—'}</strong><br><span class="muted" style="font-size:.75rem">${r.emp.email}</span></td>
-                  <td>${r.emp.dept || '—'}</td>
-                  ${r.dayHours.map(h => `<td class="day">${h || 0}</td>`).join('')}
-                  <td class="day tot-cell">${r.total}</td>
-                  <td class="day">${so.vacances} h</td>
-                  <td class="day">${so.maladie} h</td>
-                </tr>`;
-              }).join('')}
+            <tbody id="payeTbody">
+              ${rowsHTML || `<tr><td colspan="${days.length + 4}" class="muted" style="text-align:center;padding:40px">Aucune donnée pour cette période.</td></tr>`}
             </tbody>
             <tfoot>
               <tr>
-                <td>TOTAL</td><td></td>
-                ${totByDay.map(t => `<td class="day">${t}</td>`).join('')}
-                <td class="day">${grandTotal} h</td>
-                <td></td><td></td>
+                <td class="emp-col"><strong>TOTAL</strong></td>
+                ${totByDay.map((t, i) => `<td class="day${isWeekend(days[i]) ? ' day-we' : ''}">${t || ''}</td>`).join('')}
+                <td class="day tot-cell">${grandTotal} h</td>
+                <td class="day"></td>
+                <td class="day"></td>
               </tr>
             </tfoot>
           </table>
+        </div>
+
+        <div class="paye-legend">
+          <span><span class="day-pill day-present">8</span> Présent</span>
+          <span><span class="day-pill day-absent">·</span> Absent</span>
+          <span><span class="day-pill day-none">—</span> Aucune donnée</span>
+          <span><span class="day-pill day-weekend"></span> Fin de semaine</span>
         </div>
       `;
     } catch (err) {
       result.innerHTML = `<div class="error">Erreur : ${err.message}</div>`;
     }
+  },
+
+  _filterPayeRows() {
+    const q = document.getElementById('payeSearch')?.value.toLowerCase().trim() || '';
+    document.querySelectorAll('#payeTbody tr').forEach(tr => {
+      tr.style.display = !q || (tr.dataset.search || '').includes(q) ? '' : 'none';
+    });
   },
 
   exportPayeCSV() {

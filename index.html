@@ -588,8 +588,7 @@
     /* ── PAYE ───────────────────────────────────────────────────────────── */
     .paye-header {
       display: flex; justify-content: space-between; align-items: flex-start;
-      flex-wrap: wrap;
-      gap: 16px; margin-bottom: 20px;
+      flex-wrap: wrap; gap: 16px; margin-bottom: 20px;
       padding: 20px; background: var(--surface);
       border: 1px solid var(--border); border-radius: var(--radius);
     }
@@ -597,10 +596,24 @@
     .paye-title .sub { color: var(--muted); font-size: .85rem; }
     .paye-actions { display: flex; gap: 8px; }
 
+    .paye-presets { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+    .preset-btn {
+      padding: 8px 14px;
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: .82rem; font-weight: 500;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .preset-btn:hover { border-color: var(--primary); }
+    .preset-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
     .paye-filters {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
       padding: 20px;
       background: var(--surface);
       border: 1px solid var(--border);
@@ -609,13 +622,11 @@
     }
     .paye-filters .field { display: flex; flex-direction: column; gap: 6px; }
     .paye-filters label {
-      font-size: .7rem;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: .5px;
-      font-weight: 600;
+      font-size: .7rem; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .5px; font-weight: 600;
     }
     .paye-filters input[type="date"],
+    .paye-filters input[type="text"],
     .paye-filters select {
       padding: 9px 12px;
       background: var(--bg);
@@ -625,11 +636,57 @@
       font-size: .88rem;
       font-family: inherit;
     }
-    .paye-filters label.inline { flex-direction: row; align-items: center; gap: 8px; font-size: .85rem; color: var(--text); text-transform: none; letter-spacing: 0; }
 
-    .paye-table th.day, .paye-table td.day { text-align: center; }
-    .paye-table .tot-cell { font-weight: 700; color: var(--primary); font-family: var(--mono); }
-    .paye-table tfoot td { font-weight: 700; background: var(--surface-2); padding: 14px 16px; font-family: var(--mono); }
+    .paye-table-wrap { overflow-x: auto; }
+    .paye-table { min-width: 800px; }
+    .paye-table .emp-col { min-width: 220px; position: sticky; left: 0; background: var(--surface); z-index: 2; }
+    .paye-table tbody .emp-col { background: var(--surface); }
+    .paye-table tbody tr:hover .emp-col { background: var(--surface-2); }
+
+    .paye-table .emp-cell { display: flex; align-items: center; gap: 10px; }
+    .paye-table .emp-avatar {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: var(--primary); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: .7rem; flex-shrink: 0;
+    }
+    .paye-table .emp-nom { font-weight: 600; font-size: .88rem; }
+    .paye-table .emp-dept { font-size: .72rem; }
+
+    .paye-table th.day, .paye-table td.day { text-align: center; padding: 10px 6px; }
+    .paye-table th.day.day-we, .paye-table td.day.day-we { background: rgba(255,255,255,.02); }
+
+    .paye-table th.day .dh-ws { font-size: .65rem; color: var(--muted); text-transform: uppercase; }
+    .paye-table th.day .dh-num { font-size: .85rem; color: var(--text); font-weight: 700; font-family: var(--mono); }
+
+    .day-pill {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 32px; height: 28px;
+      border-radius: 6px;
+      font-family: var(--mono);
+      font-size: .8rem; font-weight: 600;
+      padding: 0 6px;
+    }
+    .day-present  { background: var(--success-bg); color: #4ade80; }
+    .day-absent   { background: var(--danger-bg);  color: #f87171; }
+    .day-none     { background: transparent; color: var(--muted); }
+    .day-weekend  { background: transparent; }
+
+    .paye-table .tot-cell { font-weight: 700; color: var(--primary); font-family: var(--mono); font-size: 1rem; }
+    .paye-table tfoot td { font-weight: 700; background: var(--surface-2); padding: 14px 10px; font-family: var(--mono); }
+
+    .conge-cell { line-height: 1.3; }
+    .conge-pris { font-weight: 600; font-family: var(--mono); font-size: .85rem; color: var(--warning); }
+    .conge-reste { font-size: .7rem; margin-top: 2px; }
+
+    .paye-legend {
+      display: flex; gap: 20px; flex-wrap: wrap;
+      margin-top: 16px; padding: 14px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border); border-radius: 8px;
+      font-size: .82rem; color: var(--muted);
+    }
+    .paye-legend span { display: inline-flex; align-items: center; gap: 8px; }
 
     /* ── ACCÈS ──────────────────────────────────────────────────────────── */
     .acces-wrap { max-width: 1000px; margin: 0 auto; }
@@ -841,10 +898,10 @@
 <div id="toast"></div>
 
 <!-- Scripts (ordre important) -->
-<script src="config.js?v=24"></script>
-<script src="auth.js?v=24"></script>
-<script src="graph.js?v=24"></script>
-<script src="app.js?v=24"></script>
+<script src="config.js?v=25"></script>
+<script src="auth.js?v=25"></script>
+<script src="graph.js?v=25"></script>
+<script src="app.js?v=25"></script>
 
 </body>
 </html>
