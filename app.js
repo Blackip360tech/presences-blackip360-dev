@@ -11,12 +11,26 @@ const App = {
   async init() {
     try {
       await Auth.init();
+
+      // Afficher l'erreur MSAL si présente (aide au diagnostic)
+      if (Auth.initError) {
+        this._showLoginError(
+          `Erreur MSAL: ${Auth.initError.errorCode || Auth.initError.message}<br>
+           <small>${Auth.initError.errorMessage || ''}</small>`
+        );
+      }
+
       if (Auth.isLoggedIn()) {
         await this._onLoginSuccess();
       }
     } catch (err) {
       this._fatalError('Erreur d\'initialisation: ' + err.message);
     }
+  },
+
+  _showLoginError(html) {
+    const el = document.getElementById('loginError');
+    if (el) { el.innerHTML = html; el.hidden = false; }
   },
 
   async _onLoginSuccess() {
