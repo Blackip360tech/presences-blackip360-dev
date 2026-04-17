@@ -104,6 +104,7 @@ const App = {
     if (app) { app.hidden = false; app.style.display = ''; }
     const btn = document.getElementById('darkBtn');
     if (btn) btn.textContent = document.documentElement.hasAttribute('data-dark') ? '☀️' : '🌙';
+    this._startClock();
   },
 
   _renderHeader() {
@@ -168,8 +169,12 @@ const App = {
 
         <div class="current-card ${st?.category || 'none'}">
           <div class="current-icon">${st?.icon || '❓'}</div>
-          <div class="current-label">${current?.StatutActuel || 'Aucun statut enregistré'}</div>
-          ${current ? `<div class="current-time">Depuis ${this._fmtTime(current.HeurePointage)}</div>` : ''}
+          <div class="current-body">
+            <div class="current-sub">Mon statut actuel</div>
+            <div class="current-label">${current?.StatutActuel || 'Aucun statut enregistré'}</div>
+            ${current ? `<div class="current-time">Depuis ${this._fmtTime(current.HeurePointage)}</div>` : ''}
+          </div>
+          ${current ? '<div class="current-dot"></div>' : ''}
         </div>
 
         <div class="notes-row">
@@ -388,78 +393,177 @@ const App = {
 
   // ── PAYE ──────────────────────────────────────────────────────────────────
   _loadPaye() {
-    const today   = new Date().toISOString().slice(0, 10);
-    const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+    const el = document.getElementById('tab-paye');
+    const today = new Date();
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const fmt = d => d.toISOString().slice(0, 10);
 
-    document.getElementById('tab-paye').innerHTML = `
-      <div class="paye-wrap">
-        <h2>Analyse des présences</h2>
-        <div class="paye-filters">
-          <label>Du&nbsp;: <input type="date" id="payeFrom" value="${weekAgo}" /></label>
-          <label>Au&nbsp;: <input type="date" id="payeTo"   value="${today}"   /></label>
-          <button class="btn-primary"   onclick="App.computePaye()">📊 Calculer</button>
-          <button class="btn-secondary" onclick="App.exportPayeCSV()">📥 Export CSV</button>
+    el.innerHTML = `
+      <div class="paye-header">
+        <div class="paye-title">
+          <h2>💰 Rapport de paie</h2>
+          <div class="sub">Générez les données de paie pour la période choisie</div>
         </div>
-        <div id="payeResult"><p class="hint">Sélectionnez une période et cliquez sur Calculer.</p></div>
-      </div>`;
+        <div class="paye-actions">
+          <button class="btn-primary" id="payeExport">⬇ Exporter CSV</button>
+          <button class="btn-secondary" id="payePrint">🖨 Imprimer</button>
+        </div>
+      </div>
+
+      <div class="paye-filters">
+        <div class="field">
+          <label>Du</label>
+          <input type="date" id="payeDateFrom" value="${fmt(monday)}">
+        </div>
+        <div class="field">
+          <label>Au</label>
+          <input type="date" id="payeDateTo" value="${fmt(sunday)}">
+        </div>
+        <div class="field">
+          <label>Département</label>
+          <select id="payeDept">
+            ${CONFIG.DEPARTEMENTS.map(d => `<option value="${d}">${d}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field">
+          <label>Action</label>
+          <button class="btn-primary" id="payeCalc">Générer le rapport</button>
+        </div>
+      </div>
+
+      <div id="payeResult"></div>
+    `;
+
+    document.getElementById('payeCalc').onclick   = () => this._computePaye();
+    document.getElementById('payeExport').onclick = () => this.exportPayeCSV();
+    document.getElementById('payePrint').onclick = () => window.print();
+
+    this._computePaye();
   },
 
-  async computePaye() {
-    const from   = document.getElementById('payeFrom').value;
-    const to     = document.getElementById('payeTo').value;
+  async _computePaye() {
     const result = document.getElementById('payeResult');
     result.innerHTML = '<div class="loading">Calcul en cours…</div>';
 
+    const fromStr = document.getElementById('payeDateFrom').value;
+    const toStr   = document.getElementById('payeDateTo').value;
+    const dept    = document.getElementById('payeDept').value;
+    const from = new Date(fromStr + 'T00:00:00');
+    const to   = new Date(toStr   + 'T23:59:59');
+
     try {
-      const all      = await Graph.getAllPresences();
+      const all = await Graph.getAllPresences();
       const filtered = all.filter(p => {
-        const d = p.HeurePointage?.slice(0, 10);
-        return d >= from && d <= to;
+        if (!p.HeurePointage) return false;
+        const d = new Date(p.HeurePointage);
+        if (d < from || d > to) return false;
+        if (dept !== 'Tous' && p.Departement !== dept) return false;
+        return true;
       });
 
-      const byEmployee = {};
+      const byEmp = {};
       for (const p of filtered) {
-        if (!byEmployee[p.EmployeEmail]) {
-          byEmployee[p.EmployeEmail] = { nom: p.EmployeNom, dept: p.Departement, entries: [] };
-        }
-        byEmployee[p.EmployeEmail].entries.push(p);
+        const k = p.EmployeEmail || 'inconnu';
+        if (!byEmp[k]) byEmp[k] = { nom: p.EmployeNom, email: k, dept: p.Departement, entries: [] };
+        byEmp[k].entries.push(p);
       }
-      this._payeData = byEmployee;
+      this._payeData = byEmp;
 
-      const rows = Object.entries(byEmployee).map(([email, d]) => {
-        const presentN = d.entries.filter(e =>
-          CONFIG.STATUTS.find(s => s.label === e.StatutActuel)?.category === 'present'
-        ).length;
-        const jours = new Set(d.entries.map(e => e.HeurePointage?.slice(0, 10))).size;
-        return `<tr>
-          <td>${d.nom || email}</td><td>${d.dept || '—'}</td>
-          <td>${jours}</td><td>${d.entries.length}</td><td>${presentN}</td>
-        </tr>`;
+      // Générer colonnes pour chaque jour de la période
+      const days = [];
+      for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+        days.push(new Date(d));
+      }
+      const dayLabels = days.map(d => d.toLocaleDateString('fr-CA', { weekday: 'short', day: 'numeric' }));
+
+      // Calculer les heures par employé par jour
+      const rows = Object.values(byEmp).map(emp => {
+        const byDay = {};
+        for (const e of emp.entries) {
+          const dateKey = e.HeurePointage.slice(0, 10);
+          if (!byDay[dateKey]) byDay[dateKey] = [];
+          byDay[dateKey].push(e);
+        }
+        const dayHours = days.map(d => {
+          const key = d.toISOString().slice(0, 10);
+          const entries = byDay[key] || [];
+          const hasPresent = entries.some(e => CONFIG.STATUTS.find(s => s.label === e.StatutActuel)?.category === 'present');
+          return hasPresent ? 8 : 0;
+        });
+        const total = dayHours.reduce((a,b) => a+b, 0);
+        return { emp, dayHours, total };
       });
+
+      rows.sort((a, b) => (a.emp.nom || '').localeCompare(b.emp.nom || ''));
+
+      // Totaux par jour
+      const totByDay = days.map((_, i) => rows.reduce((s, r) => s + r.dayHours[i], 0));
+      const grandTotal = totByDay.reduce((a,b) => a+b, 0);
 
       result.innerHTML = `
         <div class="table-wrap">
-          <table>
-            <thead><tr><th>Employé</th><th>Département</th><th>Jours actifs</th><th>Total pointages</th><th>Pointages « présent »</th></tr></thead>
-            <tbody>${rows.join('')}</tbody>
+          <table class="paye-table">
+            <thead>
+              <tr>
+                <th>Employé</th><th>Dept</th>
+                ${dayLabels.map(l => `<th class="day">${l}</th>`).join('')}
+                <th class="day">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map(r => `
+                <tr>
+                  <td><strong>${r.emp.nom || '—'}</strong><br><span class="muted" style="font-size:.75rem">${r.emp.email}</span></td>
+                  <td>${r.emp.dept || '—'}</td>
+                  ${r.dayHours.map(h => `<td class="day">${h || 0}</td>`).join('')}
+                  <td class="day tot-cell">${r.total}</td>
+                </tr>`).join('')}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td>TOTAL</td><td></td>
+                ${totByDay.map(t => `<td class="day">${t}</td>`).join('')}
+                <td class="day">${grandTotal} h</td>
+              </tr>
+            </tfoot>
           </table>
-        </div>`;
+        </div>
+      `;
     } catch (err) {
       result.innerHTML = `<div class="error">Erreur : ${err.message}</div>`;
     }
   },
 
   exportPayeCSV() {
-    if (!this._payeData) return this.showToast('Calculez d\'abord la période.', 'error');
-    const rows = [['Employé', 'Email', 'Département', 'Jours actifs', 'Total pointages', 'Présents']];
-    for (const [email, d] of Object.entries(this._payeData)) {
-      const presentN = d.entries.filter(e =>
-        CONFIG.STATUTS.find(s => s.label === e.StatutActuel)?.category === 'present'
-      ).length;
-      const jours = new Set(d.entries.map(e => e.HeurePointage?.slice(0, 10))).size;
-      rows.push([d.nom, email, d.dept, jours, d.entries.length, presentN]);
+    if (!this._payeData) return this.showToast('Générez d\'abord le rapport.', 'error');
+    const fromStr = document.getElementById('payeDateFrom').value;
+    const toStr   = document.getElementById('payeDateTo').value;
+    const from = new Date(fromStr + 'T00:00:00');
+    const to   = new Date(toStr + 'T23:59:59');
+    const days = [];
+    for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) days.push(new Date(d));
+    const dayLabels = days.map(d => d.toLocaleDateString('fr-CA', { day: '2-digit', month: '2-digit' }));
+    const rows = [['Employé', 'Email', 'Département', ...dayLabels, 'Total']];
+    for (const emp of Object.values(this._payeData)) {
+      const byDay = {};
+      for (const e of emp.entries) {
+        const k = e.HeurePointage.slice(0, 10);
+        if (!byDay[k]) byDay[k] = [];
+        byDay[k].push(e);
+      }
+      const dayHours = days.map(d => {
+        const key = d.toISOString().slice(0, 10);
+        const entries = byDay[key] || [];
+        const hasPresent = entries.some(e => CONFIG.STATUTS.find(s => s.label === e.StatutActuel)?.category === 'present');
+        return hasPresent ? 8 : 0;
+      });
+      const total = dayHours.reduce((a,b) => a+b, 0);
+      rows.push([emp.nom, emp.email, emp.dept, ...dayHours, total]);
     }
-    this._downloadCSV(rows, `paye_${this._today()}.csv`);
+    this._downloadCSV(rows, `paye_${fromStr}_${toStr}.csv`);
   },
 
   // ── ACCÈS ─────────────────────────────────────────────────────────────────
@@ -620,6 +724,25 @@ const App = {
     t.textContent = msg;
     t.className   = `toast show ${type}`;
     setTimeout(() => t.classList.remove('show'), 3500);
+  },
+
+  _startClock() {
+    const el = document.getElementById('hdrClock');
+    if (!el) return;
+    const tick = () => {
+      const now = new Date();
+      const est = now.toLocaleTimeString('fr-CA', { timeZone: 'America/Toronto', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+      const jp  = now.toLocaleTimeString('fr-CA', { timeZone: 'Asia/Tokyo',     hour: '2-digit', minute: '2-digit', hour12: false });
+      const dt  = now.toLocaleDateString('fr-CA', { timeZone: 'America/Toronto', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      const estEl = el.querySelector('.est');
+      const dEl   = el.querySelector('.date');
+      const jpEl  = el.querySelector('.jp');
+      if (estEl) estEl.textContent = est.replace(/:/g, ' : ').replace(/^(\d+) : (\d+) : (\d+)$/, '$1 h $2 min $3 s');
+      if (dEl)   dEl.textContent = dt + ' • EST';
+      if (jpEl)  jpEl.textContent = '🇯🇵 Tokyo ' + jp;
+    };
+    tick();
+    setInterval(tick, 1000);
   },
 
   _toggleDark() {
