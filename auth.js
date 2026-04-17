@@ -19,8 +19,10 @@ class BlackIPAuth {
         navigateToLoginRequestUrl: false,
       },
       cache: {
-        cacheLocation:          'localStorage',
-        storeAuthStateInCookie: true,
+        cacheLocation:           'localStorage',
+        temporaryCacheLocation:  'localStorage',
+        storeAuthStateInCookie:  true,
+        secureCookies:           false,
       },
     };
 

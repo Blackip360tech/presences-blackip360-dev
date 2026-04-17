@@ -41,7 +41,8 @@ const App = {
   _showDebug() {
     const params  = Object.fromEntries(new URLSearchParams(window.location.search));
     const hash    = window.location.hash;
-    const lsKeys  = Object.keys(localStorage).filter(k => k.startsWith('msal.'));
+    const lsAll   = Object.keys(localStorage);
+    const ssAll   = Object.keys(sessionStorage);
     const errInfo = Auth.initError
       ? `${Auth.initError.errorCode}: ${Auth.initError.errorMessage}`
       : '(aucune)';
@@ -54,8 +55,10 @@ const App = {
       Erreur init: <code>${errInfo}</code><br>
       URL params: <code>${JSON.stringify(params)}</code><br>
       Hash: <code>${hash || '(vide)'}</code><br>
-      Comptes: <code>${JSON.stringify(this._msalAccounts)}</code><br>
-      LocalStorage (${lsKeys.length} clés msal): <code style="word-break:break-all">${lsKeys.join(' | ') || '(vide)'}</code>
+      Comptes MSAL: <code>${JSON.stringify(this._msalAccounts)}</code><br>
+      localStorage (${lsAll.length} clés): <code style="word-break:break-all">${lsAll.join(' | ') || '(vide)'}</code><br>
+      sessionStorage (${ssAll.length} clés): <code style="word-break:break-all">${ssAll.join(' | ') || '(vide)'}</code><br>
+      Cookies activés: <code>${navigator.cookieEnabled}</code>
     `;
   },
 
