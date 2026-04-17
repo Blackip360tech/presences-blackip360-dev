@@ -648,18 +648,28 @@ const App = {
         </div>
       </div>
 
+      <div class="paye-presets">
+        <button class="preset-btn" data-preset="today">Aujourd'hui</button>
+        <button class="preset-btn" data-preset="week">Cette semaine</button>
+        <button class="preset-btn" data-preset="lastweek">Semaine dernière</button>
+        <button class="preset-btn" data-preset="2weeks">2 dernières semaines</button>
+        <button class="preset-btn active" data-preset="month">Ce mois</button>
+        <button class="preset-btn" data-preset="lastmonth">Mois dernier</button>
+        <button class="preset-btn" data-preset="year">Cette année</button>
+      </div>
+
       <div class="paye-filters">
         <div class="field">
-          <label>Du</label>
+          <label>📅 Du</label>
           <input type="date" id="rapFrom" value="${fmt(monthStart)}">
         </div>
         <div class="field">
-          <label>Au</label>
+          <label>📅 Au</label>
           <input type="date" id="rapTo" value="${fmt(today)}">
         </div>
         <div class="field">
-          <label>Action</label>
-          <button class="btn-primary" id="rapCalc">Générer mon rapport</button>
+          <label>&nbsp;</label>
+          <button class="btn-primary" id="rapCalc">Générer</button>
         </div>
       </div>
 
@@ -669,6 +679,48 @@ const App = {
     document.getElementById('rapCalc').onclick   = () => this._computeRapport();
     document.getElementById('rapExport').onclick = () => this._exportRapport();
     document.getElementById('rapPrint').onclick  = () => window.print();
+
+    // Presets de période
+    el.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.onclick = () => {
+        const preset = btn.dataset.preset;
+        let from, to;
+        const n = new Date();
+        if (preset === 'today') {
+          from = new Date(n); to = new Date(n);
+        } else if (preset === 'week') {
+          from = new Date(n); from.setDate(n.getDate() - ((n.getDay() + 6) % 7));
+          to = new Date(from); to.setDate(from.getDate() + 6);
+        } else if (preset === 'lastweek') {
+          from = new Date(n); from.setDate(n.getDate() - ((n.getDay() + 6) % 7) - 7);
+          to = new Date(from); to.setDate(from.getDate() + 6);
+        } else if (preset === '2weeks') {
+          to = new Date(n);
+          from = new Date(n); from.setDate(n.getDate() - 13);
+        } else if (preset === 'month') {
+          from = new Date(n.getFullYear(), n.getMonth(), 1);
+          to   = new Date(n.getFullYear(), n.getMonth() + 1, 0);
+        } else if (preset === 'lastmonth') {
+          from = new Date(n.getFullYear(), n.getMonth() - 1, 1);
+          to   = new Date(n.getFullYear(), n.getMonth(), 0);
+        } else if (preset === 'year') {
+          from = new Date(n.getFullYear(), 0, 1);
+          to   = new Date(n.getFullYear(), 11, 31);
+        }
+        document.getElementById('rapFrom').value = fmt(from);
+        document.getElementById('rapTo').value   = fmt(to);
+        el.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b === btn));
+        this._computeRapport();
+      };
+    });
+
+    // Quand l'utilisateur change manuellement une date, désactiver les presets
+    ['rapFrom', 'rapTo'].forEach(id => {
+      document.getElementById(id).onchange = () => {
+        el.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+        this._computeRapport();
+      };
+    });
 
     this._computeRapport();
   },
