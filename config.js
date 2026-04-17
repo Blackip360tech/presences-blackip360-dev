@@ -1,5 +1,4 @@
 // BlackIP360 Présences — Configuration DEV
-// Liste SharePoint : Presences_Employes_Dev (séparée de la prod)
 
 const CONFIG = {
 
@@ -13,7 +12,7 @@ const CONFIG = {
   // ── SharePoint ────────────────────────────────────────────────────────────
   SHAREPOINT_HOST:      'blackip360.sharepoint.com',
   SHAREPOINT_SITE_PATH: '/sites/PlanificationTI',
-  SHAREPOINT_LIST:      'Presences_Employes_Dev',  // Liste de test séparée
+  SHAREPOINT_LIST:      'Presences_Employes',
 
   // ── Graph API ─────────────────────────────────────────────────────────────
   GRAPH_BASE: 'https://graph.microsoft.com/v1.0',
