@@ -1,4 +1,5 @@
-// BlackIP360 Présences — Authentification MSAL.js
+// BlackIP360 Présences — Authentification MSAL.js (redirect-only)
+// Redirect uniquement : compatible Teams, AuthPoint, navigateurs stricts
 class BlackIPAuth {
   constructor() {
     this.msal    = null;
@@ -8,60 +9,50 @@ class BlackIPAuth {
   async init() {
     const msalCfg = {
       auth: {
-        clientId:    CONFIG.CLIENT_ID,
-        authority:   `https://login.microsoftonline.com/${CONFIG.TENANT_ID}`,
-        redirectUri: CONFIG.APP_URL + '/',
+        clientId:              CONFIG.CLIENT_ID,
+        authority:             `https://login.microsoftonline.com/${CONFIG.TENANT_ID}`,
+        redirectUri:           CONFIG.APP_URL + '/',
+        postLogoutRedirectUri: CONFIG.APP_URL + '/',
+        navigateToLoginRequestUrl: true,
       },
       cache: {
-        cacheLocation:        'sessionStorage',
-        storeAuthStateInCookie: false,
+        cacheLocation:          'localStorage',  // persist entre les redirects
+        storeAuthStateInCookie: true,            // requis pour certains navigateurs strict
       },
     };
 
     this.msal = new msal.PublicClientApplication(msalCfg);
     await this.msal.initialize();
 
-    // Récupérer le résultat d'un redirect précédent
-    const result = await this.msal.handleRedirectPromise();
-    if (result?.account) {
-      this.account = result.account;
-    } else {
-      const accounts = this.msal.getAllAccounts();
-      if (accounts.length) this.account = accounts[0];
+    // Intercepter le retour de redirect Microsoft
+    try {
+      const result = await this.msal.handleRedirectPromise();
+      if (result?.account) {
+        this.account = result.account;
+        return;
+      }
+    } catch (err) {
+      console.error('[MSAL] handleRedirectPromise error:', err);
     }
-  }
 
-  // Codes d'erreur qui forcent le fallback en redirect plutôt que popup
-  _isPopupBlocked(err) {
-    return ['popup_window_error', 'block_nested_popups', 'empty_window_error'].includes(err.errorCode);
+    // Reprendre la session existante si présente
+    const accounts = this.msal.getAllAccounts();
+    if (accounts.length) this.account = accounts[0];
   }
 
   async login() {
-    const req = { scopes: CONFIG.SCOPES };
-    try {
-      const r = await this.msal.loginPopup(req);
-      this.account = r.account;
-      return r.account;
-    } catch (err) {
-      if (this._isPopupBlocked(err)) {
-        await this.msal.loginRedirect(req);
-        return;
-      }
-      throw err;
-    }
+    await this.msal.loginRedirect({
+      scopes: CONFIG.SCOPES,
+      prompt: 'select_account',
+    });
+    // La page se redirige vers Microsoft — le retour est géré dans init()
   }
 
   async logout() {
-    try {
-      await this.msal.logoutPopup({ account: this.account });
-    } catch (err) {
-      if (this._isPopupBlocked(err)) {
-        await this.msal.logoutRedirect({ account: this.account });
-        return;
-      }
-      throw err;
-    }
-    this.account = null;
+    await this.msal.logoutRedirect({
+      account:               this.account,
+      postLogoutRedirectUri: CONFIG.APP_URL + '/',
+    });
   }
 
   async getToken() {
@@ -74,19 +65,11 @@ class BlackIPAuth {
       return r.accessToken;
     } catch (err) {
       if (err instanceof msal.InteractionRequiredAuthError) {
-        try {
-          const r = await this.msal.acquireTokenPopup({
-            scopes:  CONFIG.SCOPES,
-            account: this.account,
-          });
-          return r.accessToken;
-        } catch (popupErr) {
-          if (this._isPopupBlocked(popupErr)) {
-            await this.msal.acquireTokenRedirect({ scopes: CONFIG.SCOPES, account: this.account });
-            return;
-          }
-          throw popupErr;
-        }
+        // Token silencieux impossible → redirect
+        await this.msal.acquireTokenRedirect({
+          scopes:  CONFIG.SCOPES,
+          account: this.account,
+        });
       }
       throw err;
     }
