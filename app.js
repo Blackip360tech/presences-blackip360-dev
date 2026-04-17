@@ -64,21 +64,32 @@ const App = {
 
   async _onLoginSuccess() {
     this.user = Auth.getUser();
+    console.log('[APP] _onLoginSuccess user:', this.user);
 
+    let profileErr = null;
     try {
-      const profile      = await Graph.getProfile();
+      const profile        = await Graph.getProfile();
       this.user.department = profile.department  || 'Non défini';
       this.user.jobTitle   = profile.jobTitle    || '';
       this.user.email      = profile.mail        || this.user.email;
       this.user.name       = profile.displayName || this.user.name;
-    } catch (_) {
-      // Graph pas encore configuré — pas bloquant
+      console.log('[APP] profil Graph OK:', this.user.name);
+    } catch (err) {
+      profileErr = err.message;
       this.user.department = 'Non défini';
+      console.warn('[APP] Graph.getProfile() échec:', err.message);
     }
 
     this._checkAdmin();
     this._showApp();
     this._renderHeader();
+
+    // Barre de debug temporaire en haut de l'app
+    const dbgBar = document.createElement('div');
+    dbgBar.style.cssText = 'background:#fff3cd;border-bottom:2px solid #ffc107;padding:8px 16px;font-size:.8rem;font-family:monospace;word-break:break-all';
+    dbgBar.innerHTML = `<strong>DEBUG APP</strong> — Connecté: <b>${this.user.email}</b> | Dept: ${this.user.department} | Admin: ${this.isAdmin}${profileErr ? ' | ❌ Graph.getProfile: ' + profileErr : ' | ✅ Graph OK'}`;
+    document.body.prepend(dbgBar);
+
     await this.loadTab('statut');
   },
 
