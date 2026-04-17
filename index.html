@@ -197,7 +197,7 @@
     #userEmail { display: none; }
     #userDept { font-size: .72rem; color: var(--muted); }
 
-    #darkBtn, #logoutBtn {
+    #logoutBtn {
       background: transparent;
       border: 1px solid var(--border);
       color: var(--text);
@@ -207,8 +207,7 @@
       font-size: .8rem;
       transition: background .15s;
     }
-    #darkBtn { border: none; padding: 4px 8px; font-size: 1rem; }
-    #darkBtn:hover, #logoutBtn:hover { background: var(--surface-2); }
+    #logoutBtn:hover { background: var(--surface-2); }
 
     /* Content */
     main {
@@ -514,8 +513,10 @@
     }
     .tv-logo-txt .t1 { font-size: 1.3rem; font-weight: 800; }
     .tv-logo-txt .t2 { font-size: .78rem; color: var(--muted); }
-    .tv-clock  { font-family: var(--mono); font-size: 1.8rem; color: var(--primary); text-align: right; line-height: 1.15; }
-    .tv-clock .date { font-size: .75rem; color: var(--muted); font-family: inherit; }
+    .tv-clock  { font-family: var(--mono); text-align: right; line-height: 1.2; }
+    .tv-clock .time-est { font-size: 1.8rem; color: var(--primary); font-weight: 700; }
+    .tv-clock .date     { font-size: .78rem; color: var(--muted); margin-top: 2px; }
+    .tv-clock .time-jp  { font-size: .85rem; color: var(--muted); margin-top: 4px; font-family: var(--mono); }
 
     .tv-totals {
       display: grid;
@@ -735,8 +736,6 @@
       <div class="jp">JP --:--</div>
     </div>
 
-    <button id="darkBtn" title="Mode clair/sombre">🌙</button>
-
     <div class="user-chip">
       <div class="user-avatar" id="userInitials">?</div>
       <div class="user-details">
@@ -772,10 +771,10 @@
     }
   };
 </script>
-<script src="config.js?v=12"></script>
-<script src="auth.js?v=12"></script>
-<script src="graph.js?v=12"></script>
-<script src="app.js?v=12"></script>
+<script src="config.js?v=13"></script>
+<script src="auth.js?v=13"></script>
+<script src="graph.js?v=13"></script>
+<script src="app.js?v=13"></script>
 
 </body>
 </html>

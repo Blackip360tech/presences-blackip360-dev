@@ -102,8 +102,6 @@ const App = {
     if (ls) { ls.hidden = true; ls.style.display = 'none'; }
     const app = document.getElementById('app');
     if (app) { app.hidden = false; app.style.display = ''; }
-    const btn = document.getElementById('darkBtn');
-    if (btn) btn.textContent = document.documentElement.hasAttribute('data-dark') ? '☀️' : '🌙';
     this._startClock();
   },
 
@@ -129,6 +127,10 @@ const App = {
     if (tabId !== 'tv' && this.tvInterval) {
       clearInterval(this.tvInterval);
       this.tvInterval = null;
+    }
+    if (tabId !== 'tv' && this.tvClockInterval) {
+      clearInterval(this.tvClockInterval);
+      this.tvClockInterval = null;
     }
 
     await this.loadTab(tabId);
@@ -214,9 +216,17 @@ const App = {
   _bindStatutBtns() {
     document.querySelectorAll('.statut-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const statut = btn.dataset.statut;
-        const notes  = document.getElementById('notesInput')?.value || '';
-        await this._setStatut(statut, notes);
+        const statutLabel = btn.dataset.statut;
+        const statutCfg = CONFIG.STATUTS.find(s => s.label === statutLabel);
+        const needsNote = statutCfg && (statutCfg.id === 'route_bip' || statutCfg.id === 'route_cv247');
+        const notesEl = document.getElementById('notesInput');
+        const notesValue = notesEl?.value?.trim() || '';
+        if (needsNote && !notesValue) {
+          this.showToast('Une note est obligatoire pour ce statut (indiquer le client).', 'error');
+          notesEl?.focus();
+          return;
+        }
+        await this._setStatut(statutLabel, notesValue);
       });
     });
   },
@@ -341,6 +351,23 @@ const App = {
   async _loadTV() {
     await this._refreshTV();
     this.tvInterval = setInterval(() => this._refreshTV(), CONFIG.TV_REFRESH_MS);
+    if (this.tvClockInterval) clearInterval(this.tvClockInterval);
+    this.tvClockInterval = setInterval(() => this._updateTVClock(), 1000);
+  },
+
+  _updateTVClock() {
+    const wrap = document.querySelector('#tab-tv .tv-clock');
+    if (!wrap) return;
+    const now = new Date();
+    const est = now.toLocaleTimeString('fr-CA', { timeZone: 'America/Toronto', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false }).replace(/^(\d+):(\d+):(\d+)$/, '$1 h $2 min $3 s');
+    const jp  = now.toLocaleTimeString('fr-CA', { timeZone: 'Asia/Tokyo', hour:'2-digit', minute:'2-digit', hour12:false });
+    const dt  = now.toLocaleDateString('fr-CA', { timeZone: 'America/Toronto', weekday:'long', day:'numeric', month:'long', year:'numeric' });
+    const estEl = wrap.querySelector('.time-est');
+    const dEl   = wrap.querySelector('.date');
+    const jpEl  = wrap.querySelector('.time-jp');
+    if (estEl) estEl.textContent = est;
+    if (dEl)   dEl.textContent = dt + ' • EST';
+    if (jpEl)  jpEl.textContent = '🇯🇵 Tokyo ' + jp;
   },
 
   async _refreshTV() {
@@ -357,11 +384,20 @@ const App = {
     const presents = statuses.filter(p => CONFIG.STATUTS.find(s => s.label === p.StatutActuel)?.category === 'present');
     const absents  = statuses.filter(p => CONFIG.STATUTS.find(s => s.label === p.StatutActuel)?.category === 'absent');
 
+    const tvClockHtml = `
+          <div class="tv-clock">
+            <div class="time-est">--</div>
+            <div class="date">—</div>
+            <div class="time-jp">🇯🇵 Tokyo --:--</div>
+          </div>`;
+
+    setTimeout(() => this._updateTVClock(), 0);
+
     return `
       <div class="tv-wrap">
         <div class="tv-hdr">
           <span class="tv-logo">BlackIP360</span>
-          <span class="tv-clock">${new Date().toLocaleString('fr-CA')}</span>
+          ${tvClockHtml}
           <span class="tv-totals">${presents.length} présents · ${absents.length} absents · ${statuses.length} total</span>
         </div>
 
@@ -745,13 +781,6 @@ const App = {
     setInterval(tick, 1000);
   },
 
-  _toggleDark() {
-    const on = document.documentElement.toggleAttribute('data-dark');
-    localStorage.setItem('bip-dark', on ? '1' : '0');
-    const btn = document.getElementById('darkBtn');
-    if (btn) btn.textContent = on ? '☀️' : '🌙';
-  },
-
   _fatalError(msg) {
     document.body.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;background:#0078d4;color:white">
@@ -766,7 +795,6 @@ const App = {
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   App.init();
-  document.getElementById('darkBtn')?.addEventListener('click', () => App._toggleDark());
 
   document.getElementById('loginBtn')?.addEventListener('click', async () => {
     try {
