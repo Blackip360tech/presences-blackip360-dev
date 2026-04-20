@@ -33,25 +33,7 @@ const CONFIG = {
 
   // ── Graph API ─────────────────────────────────────────────────────────────
   GRAPH_BASE: 'https://graph.microsoft.com/v1.0',
-  SCOPES: ['User.Read', 'Sites.ReadWrite.All', 'Presence.Read'],
-
-  // Mapping Teams → libellé + icône
-  TEAMS_PRESENCE: {
-    Available:              { label: 'Disponible',       icon: '🟢', color: '#2ea043' },
-    Busy:                   { label: 'Occupé',           icon: '🔴', color: '#f85149' },
-    DoNotDisturb:           { label: 'Ne pas déranger',  icon: '⛔', color: '#f85149' },
-    InACall:                { label: 'En appel',         icon: '📞', color: '#c084fc' },
-    InAConferenceCall:      { label: 'En conférence',    icon: '🎙️', color: '#c084fc' },
-    InAMeeting:             { label: 'En réunion',       icon: '📅', color: '#c084fc' },
-    Away:                   { label: 'Absent',           icon: '🌙', color: '#d29922' },
-    BeRightBack:            { label: 'Revient',          icon: '↩️', color: '#d29922' },
-    Offline:                { label: 'Hors ligne',       icon: '⚫', color: '#7d8590' },
-    PresenceUnknown:        { label: 'Inconnu',          icon: '❓', color: '#7d8590' },
-    Presenting:             { label: 'En présentation',  icon: '🎬', color: '#c084fc' },
-    UrgentInterruptionsOnly:{ label: 'Urgences seulement',icon: '🚨', color: '#f85149' },
-    OffWork:                { label: 'Hors travail',     icon: '🏠', color: '#7d8590' },
-    OutOfOffice:            { label: 'Hors du bureau',   icon: '✈️', color: '#7d8590' },
-  },
+  SCOPES: ['User.Read', 'Sites.ReadWrite.All'],
 
   // Types de congé
   TYPES_CONGE: [
@@ -80,8 +62,9 @@ const CONFIG = {
     { id: 'teletravail', label: 'Je suis là en télétravail',                 icon: '🏠', color: '#0dcaf0', category: 'present' },
     { id: 'route_bip',   label: 'Client BlackIP360 - Je suis sur la route',  icon: '🚗', color: '#fd7e14', category: 'present' },
     { id: 'route_cv247', label: 'Client CV247/EMG - Je suis sur la route',   icon: '🛣️', color: '#d63384', category: 'present' },
-    { id: 'formation',   label: 'En formation',                              icon: '📚', color: '#6f42c1', category: 'present' },
-    { id: 'quart_fini',  label: 'Quart de travail terminé',                  icon: '✅', color: '#6c757d', category: 'absent'  },
+    { id: 'formation',       label: 'En formation',                          icon: '📚', color: '#6f42c1', category: 'present' },
+    { id: 'meeting_dnd',     label: 'En meeting, ne pas déranger',           icon: '📅', color: '#c084fc', category: 'present' },
+    { id: 'quart_fini',      label: 'Quart de travail terminé',              icon: '✅', color: '#6c757d', category: 'absent'  },
     { id: 'rdv_perso',   label: 'Parti pour un rendez-vous personnel',       icon: '📅', color: '#20c997', category: 'absent'  },
     { id: 'pause',       label: 'Parti en pause',                            icon: '☕', color: '#795548', category: 'absent'  },
     { id: 'diner',       label: 'Parti en dîner',                            icon: '🍽️', color: '#ff9800', category: 'absent'  },

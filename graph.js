@@ -53,11 +53,6 @@ class GraphAPI {
     return this._call('/me?$select=displayName,mail,jobTitle,department');
   }
 
-  // ── Présence Teams de l'utilisateur ──────────────────────────────────────
-  async getMyPresence() {
-    return this._call('/me/presence');
-  }
-
   // ── Toutes les présences (500 max, triées par heure desc) ─────────────────
   async getAllPresences() {
     const sid = await this._siteIdCached();
