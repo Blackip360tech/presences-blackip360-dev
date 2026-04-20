@@ -49,6 +49,17 @@ const App = {
       }
     } catch (err) { /* pas bloquant */ }
 
+    // Charger les statuts dynamiques depuis SharePoint (override CONFIG.STATUTS si la liste existe)
+    try {
+      const spStatuts = await Graph.getStatutsConfig();
+      if (spStatuts && spStatuts.length > 0) {
+        CONFIG.STATUTS = spStatuts;
+        console.log('[APP] Statuts chargés depuis SharePoint:', spStatuts.length);
+      }
+    } catch (err) {
+      console.warn('[APP] Statuts_Config liste vide ou inaccessible — fallback config.js', err.message);
+    }
+
     this._checkAdmin();
     this._showApp();
     this._renderHeader();
@@ -341,6 +352,11 @@ const App = {
               ${this._renderDemandesListe((toutesDemandes || []).filter(d => d.Statut !== 'En attente'), false)}
             </div>
           </div>
+
+          <h2 style="margin-top:28px">✏️ Modifications de pointages — En attente</h2>
+          <div class="dem-list-card">
+            <div id="modifPointagesWrap"><div class="loading">Chargement…</div></div>
+          </div>
         ` : ''}
       `;
 
@@ -352,6 +368,7 @@ const App = {
         el.querySelectorAll('[data-refuse]').forEach(btn =>
           btn.onclick = () => this._decideDemande(btn.dataset.refuse, 'Refusée')
         );
+        this._renderModifPointagesAdmin();
       }
 
       // Filtres demandes
@@ -491,6 +508,74 @@ const App = {
       }
 
       this.showToast(`Demande ${statut.toLowerCase()} ✓`, 'success');
+      await this._loadDemandes();
+    } catch (err) {
+      this.showToast('Erreur : ' + err.message, 'error');
+    }
+  },
+
+  async _renderModifPointagesAdmin() {
+    const wrap = document.getElementById('modifPointagesWrap');
+    if (!wrap) return;
+    try {
+      const all = await Graph.getAllModifications().catch(() => []);
+      const attente = all.filter(m => m.Statut === 'En attente');
+
+      if (!attente.length) {
+        wrap.innerHTML = '<div class="muted" style="padding:20px;text-align:center">Aucune modification en attente</div>';
+        return;
+      }
+
+      wrap.innerHTML = attente.map(m => `
+        <div class="dem-item">
+          <div class="dem-item-hdr">
+            <div class="dem-item-type">✏️ ${m.EmployeNom || m.EmployeEmail}</div>
+            <span class="dem-statut attente">En attente</span>
+          </div>
+          <div class="dem-item-dates" style="margin-top:8px">
+            <div><strong>Avant :</strong> ${m.AncienStatut} · ${this._fmtDateTime(m.AncienneHeure)}</div>
+            <div style="margin-top:4px"><strong>Après :</strong> ${m.NouveauStatut} · ${this._fmtDateTime(m.NouvelleHeure)}</div>
+          </div>
+          ${m.Motif ? `<div class="dem-item-motif">💬 ${m.Motif}</div>` : ''}
+          <div class="dem-admin-actions">
+            <button class="btn-primary" data-mod-approve="${m.id}" data-pid="${m.PointageId}" data-new-statut="${m.NouveauStatut}" data-new-heure="${m.NouvelleHeure}">✓ Approuver</button>
+            <button class="btn-danger" data-mod-refuse="${m.id}">✗ Refuser</button>
+          </div>
+        </div>
+      `).join('');
+
+      wrap.querySelectorAll('[data-mod-approve]').forEach(btn => {
+        btn.onclick = () => this._decideModif(btn.dataset.modApprove, 'Approuvée', {
+          pointageId: btn.dataset.pid,
+          newStatut:  btn.dataset.newStatut,
+          newHeure:   btn.dataset.newHeure,
+        });
+      });
+      wrap.querySelectorAll('[data-mod-refuse]').forEach(btn => {
+        btn.onclick = () => this._decideModif(btn.dataset.modRefuse, 'Refusée');
+      });
+    } catch (err) {
+      wrap.innerHTML = `<div class="error">Erreur : ${err.message}</div>`;
+    }
+  },
+
+  async _decideModif(modId, statut, applyData) {
+    const notes = prompt(statut === 'Approuvée' ? 'Note optionnelle :' : 'Raison du refus (optionnel) :');
+    if (notes === null) return;
+    try {
+      // Si approuvée : mettre à jour le pointage original AVANT de marquer la modif
+      if (statut === 'Approuvée' && applyData) {
+        await Graph.updatePointage(applyData.pointageId, {
+          StatutActuel:  applyData.newStatut,
+          HeurePointage: new Date(applyData.newHeure).toISOString(),
+        });
+      }
+      await Graph.updateModificationStatut(modId, {
+        statut,
+        approbateur: this.user.email,
+        notes: notes || '',
+      });
+      this.showToast(`Modification ${statut.toLowerCase()} ✓`, 'success');
       await this._loadDemandes();
     } catch (err) {
       this.showToast('Erreur : ' + err.message, 'error');
@@ -638,6 +723,114 @@ const App = {
     } catch (err) {
       wrap.innerHTML = `<div class="error">Erreur : ${err.message}</div>`;
     }
+  },
+
+  async _renderStatutsAdmin() {
+    const wrap = document.getElementById('accesStatutsWrap');
+    if (!wrap) return;
+    try {
+      const statuts = await Graph.getStatutsConfig().catch(() => []);
+      const rows = statuts.length ? statuts : CONFIG.STATUTS.map((s, i) => ({ ...s, ordre: i, actif: true, itemId: null }));
+
+      wrap.innerHTML = `
+        <div class="table-wrap" style="overflow-x:auto">
+          <table style="min-width:900px">
+            <thead>
+              <tr>
+                <th style="width:60px">Ordre</th>
+                <th>Identifiant</th>
+                <th>Libellé</th>
+                <th style="width:70px">Icône</th>
+                <th style="width:120px">Couleur</th>
+                <th>Catégorie</th>
+                <th style="width:60px">Actif</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="statutsTbody">
+              ${rows.map(s => this._renderStatutRow(s)).join('')}
+              ${this._renderStatutRow({ id: '', label: '', icon: '', color: '#293af2', category: 'present', ordre: (rows.length + 1), actif: true, itemId: null, isNew: true })}
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      wrap.querySelectorAll('.statut-save').forEach(btn => {
+        btn.onclick = async () => {
+          const tr = btn.closest('tr');
+          const payload = {
+            id:       tr.querySelector('.s-id').value.trim(),
+            label:    tr.querySelector('.s-label').value.trim(),
+            icon:     tr.querySelector('.s-icon').value.trim(),
+            color:    tr.querySelector('.s-color').value,
+            category: tr.querySelector('.s-cat').value,
+            ordre:    parseInt(tr.querySelector('.s-ordre').value) || 0,
+            actif:    tr.querySelector('.s-actif').checked,
+          };
+          if (!payload.id || !payload.label) { this.showToast('Identifiant et libellé requis', 'error'); return; }
+          const itemId = tr.dataset.itemId;
+          btn.disabled = true;
+          const orig = btn.textContent;
+          btn.textContent = '⏳';
+          try {
+            if (itemId && itemId !== 'null') {
+              await Graph.updateStatut(itemId, payload);
+            } else {
+              await Graph.createStatut(payload);
+            }
+            this.showToast('Statut enregistré', 'success');
+            await this._renderStatutsAdmin(); // refresh
+          } catch (err) {
+            btn.textContent = '❌';
+            this.showToast('Erreur : ' + err.message, 'error');
+            setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2000);
+          }
+        };
+      });
+
+      wrap.querySelectorAll('.statut-del').forEach(btn => {
+        btn.onclick = async () => {
+          if (!confirm('Supprimer ce statut ? Les pointages existants avec ce statut resteront mais n\'auront plus d\'icône.')) return;
+          const tr = btn.closest('tr');
+          const itemId = tr.dataset.itemId;
+          if (!itemId || itemId === 'null') { tr.remove(); return; }
+          btn.disabled = true; btn.textContent = '⏳';
+          try {
+            await Graph.deleteStatut(itemId);
+            this.showToast('Statut supprimé', 'success');
+            await this._renderStatutsAdmin();
+          } catch (err) {
+            btn.textContent = '❌';
+            this.showToast('Erreur : ' + err.message, 'error');
+          }
+        };
+      });
+    } catch (err) {
+      wrap.innerHTML = `<div class="error">Erreur : ${err.message}</div>`;
+    }
+  },
+
+  _renderStatutRow(s) {
+    const inp = 'padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;font-size:.82rem;width:100%';
+    return `
+      <tr data-item-id="${s.itemId || 'null'}" ${s.isNew ? 'style="background:var(--surface-2)"' : ''}>
+        <td><input type="number" class="s-ordre" value="${s.ordre || 0}" style="${inp};width:60px"></td>
+        <td><input type="text" class="s-id" value="${s.id || ''}" placeholder="bureau" style="${inp};width:140px"></td>
+        <td><input type="text" class="s-label" value="${s.label || ''}" placeholder="Je suis au bureau" style="${inp}"></td>
+        <td><input type="text" class="s-icon" value="${s.icon || ''}" placeholder="🏢" style="${inp};width:60px;font-size:1rem;text-align:center"></td>
+        <td><input type="color" class="s-color" value="${s.color || '#293af2'}" style="${inp};width:70px;padding:2px;cursor:pointer"></td>
+        <td>
+          <select class="s-cat" style="${inp};width:100px">
+            <option value="present" ${s.category === 'present' ? 'selected' : ''}>Présent</option>
+            <option value="absent"  ${s.category === 'absent'  ? 'selected' : ''}>Absent</option>
+          </select>
+        </td>
+        <td style="text-align:center"><input type="checkbox" class="s-actif" ${s.actif !== false ? 'checked' : ''} style="width:18px;height:18px;accent-color:var(--primary);cursor:pointer"></td>
+        <td>
+          <button class="btn-primary statut-save" style="padding:6px 10px;font-size:.8rem">${s.isNew ? '➕' : '💾'}</button>
+          ${!s.isNew ? `<button class="btn-danger statut-del" style="padding:6px 10px;font-size:.8rem;margin-left:4px">🗑️</button>` : ''}
+        </td>
+      </tr>`;
   },
 
   // ── CALCUL DES HEURES TRAVAILLÉES ─────────────────────────────────────────
@@ -868,7 +1061,7 @@ const App = {
                     <td><strong>${dayLabel}</strong></td>
                     <td>${entries.length ? entries.map(e => {
                       const st = CONFIG.STATUTS.find(s => s.label === e.StatutActuel);
-                      return `<span class="status-pill" style="margin-right:6px;margin-bottom:4px;display:inline-flex">${st?.icon || '❓'} ${e.StatutActuel} <span class="muted" style="margin-left:6px">${this._fmtTime(e.HeurePointage)}</span></span>`;
+                      return `<span class="status-pill" style="margin-right:6px;margin-bottom:4px;display:inline-flex;align-items:center;gap:6px">${st?.icon || '❓'} ${e.StatutActuel} <span class="muted" style="margin-left:2px">${this._fmtTime(e.HeurePointage)}</span> <button class="mod-punch-btn" data-pid="${e.id}" data-statut="${e.StatutActuel}" data-heure="${e.HeurePointage}" title="Demander une modification" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:0;margin-left:4px;font-size:.85rem">✏️</button></span>`;
                     }).join('') : '<span class="muted">—</span>'}</td>
                     <td style="text-align:center;font-family:var(--mono);font-weight:700;color:${hours ? 'var(--primary)' : 'var(--muted)'}">${hours}</td>
                   </tr>`;
@@ -898,6 +1091,10 @@ const App = {
           </div>
         ` : ''}
       `;
+
+      result.querySelectorAll('.mod-punch-btn').forEach(btn => {
+        btn.onclick = () => this._openModifPointageForm(btn.dataset.pid, btn.dataset.statut, btn.dataset.heure);
+      });
     } catch (err) {
       result.innerHTML = `<div class="error">Erreur : ${err.message}</div>`;
     }
@@ -936,6 +1133,73 @@ const App = {
       }
     }
     this._downloadCSV(rows, `mon_rapport_${this._today()}.csv`);
+  },
+
+  _openModifPointageForm(pointageId, statutActuel, heureActuelle) {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px';
+    overlay.innerHTML = `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;max-width:500px;width:100%">
+        <h3 style="margin-bottom:16px;color:var(--text);text-transform:none;letter-spacing:0;font-size:1.1rem">✏️ Demande de modification de pointage</h3>
+        <p class="muted" style="margin-bottom:18px;font-size:.85rem">Votre demande sera soumise à l'approbation d'un administrateur.</p>
+
+        <div style="margin-bottom:14px">
+          <label style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;display:block;margin-bottom:6px">Nouveau statut</label>
+          <select id="modStatut" style="width:100%;padding:10px 14px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:.9rem">
+            ${CONFIG.STATUTS.map(s => `<option value="${s.label}" ${s.label === statutActuel ? 'selected' : ''}>${s.icon} ${s.label}</option>`).join('')}
+          </select>
+        </div>
+
+        <div style="margin-bottom:14px">
+          <label style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;display:block;margin-bottom:6px">Nouvelle date / heure</label>
+          <input type="datetime-local" id="modHeure" value="${new Date(heureActuelle).toISOString().slice(0, 16)}" style="width:100%;padding:10px 14px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:.9rem">
+        </div>
+
+        <div style="margin-bottom:18px">
+          <label style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;display:block;margin-bottom:6px">Motif *</label>
+          <textarea id="modMotif" placeholder="Pourquoi ce changement ?" maxlength="500" required style="width:100%;padding:10px 14px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:.9rem;resize:vertical;min-height:70px"></textarea>
+        </div>
+
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button class="btn-secondary" id="modCancel">Annuler</button>
+          <button class="btn-primary" id="modSubmit">Soumettre la demande</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const close = () => overlay.remove();
+    document.getElementById('modCancel').onclick = close;
+    overlay.onclick = (e) => { if (e.target === overlay) close(); };
+
+    document.getElementById('modSubmit').onclick = async () => {
+      const motif = document.getElementById('modMotif').value.trim();
+      if (!motif) { this.showToast('Motif requis', 'error'); return; }
+      const nouveauStatut = document.getElementById('modStatut').value;
+      const nouvelleHeure = document.getElementById('modHeure').value;
+
+      const btn = document.getElementById('modSubmit');
+      btn.disabled = true; btn.textContent = 'Envoi…';
+      try {
+        await Graph.createModification({
+          pointageId,
+          email:         this.user.email,
+          nom:           this.user.name,
+          ancienStatut:  statutActuel,
+          nouveauStatut,
+          ancienneHeure: heureActuelle,
+          nouvelleHeure,
+          motif,
+        });
+        this.showToast('Demande soumise ✓', 'success');
+        close();
+        await this._computeRapport();
+      } catch (err) {
+        this.showToast('Erreur : ' + err.message, 'error');
+        btn.disabled = false; btn.textContent = 'Soumettre la demande';
+      }
+    };
   },
 
   // ── ADMIN ─────────────────────────────────────────────────────────────────
@@ -1516,6 +1780,14 @@ const App = {
           </div>
 
           <div class="acces-card">
+            <h3>🎨 Gestion des statuts de pointage</h3>
+            <p class="muted" style="margin-bottom:14px;font-size:.85rem">
+              Personnalisez les statuts disponibles sans modifier le code. Chaque statut apparaîtra dans "Mon statut" pour tous les employés.
+            </p>
+            <div id="accesStatutsWrap"><div class="loading">Chargement…</div></div>
+          </div>
+
+          <div class="acces-card">
             <h3>📚 Documentation</h3>
             <p class="muted" style="margin-bottom:14px;font-size:.85rem">
               Consultez le guide d'administration complet pour la configuration, l'ajout d'utilisateurs, les statuts et les départements.
@@ -1539,6 +1811,9 @@ const App = {
         await this._renderSoldesAdmin();
         newWrap.id = 'accesSoldesWrap';
       }
+    }
+    if (this.isAdmin) {
+      await this._renderStatutsAdmin();
     }
   },
 

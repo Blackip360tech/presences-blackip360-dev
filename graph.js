@@ -230,6 +230,131 @@ class GraphAPI {
       }),
     });
   }
+
+  // ── STATUTS DYNAMIQUES ────────────────────────────────────────────────────
+  async getStatutsConfig() {
+    const sid = await this._siteIdCached();
+    const lid = await this._listIdForName(CONFIG.SHAREPOINT_LIST_STATUTS);
+    const d = await this._call(`/sites/${sid}/lists/${lid}/items?$expand=fields&$top=200`);
+    return (d.value || [])
+      .map(i => ({
+        itemId:   i.id,
+        id:       i.fields.StatutId,
+        label:    i.fields.Label,
+        icon:     i.fields.Icon,
+        color:    i.fields.Color,
+        category: i.fields.Category,
+        ordre:    Number(i.fields.Ordre) || 0,
+        actif:    i.fields.Actif !== false,
+      }))
+      .filter(s => s.actif !== false)
+      .sort((a, b) => a.ordre - b.ordre);
+  }
+
+  async createStatut(s) {
+    const sid = await this._siteIdCached();
+    const lid = await this._listIdForName(CONFIG.SHAREPOINT_LIST_STATUTS);
+    return this._call(`/sites/${sid}/lists/${lid}/items`, {
+      method: 'POST',
+      body: JSON.stringify({
+        fields: {
+          StatutId: s.id,
+          Label:    s.label,
+          Icon:     s.icon,
+          Color:    s.color,
+          Category: s.category,
+          Ordre:    Number(s.ordre) || 0,
+          Actif:    s.actif !== false,
+        },
+      }),
+    });
+  }
+
+  async updateStatut(itemId, s) {
+    const sid = await this._siteIdCached();
+    const lid = await this._listIdForName(CONFIG.SHAREPOINT_LIST_STATUTS);
+    return this._call(`/sites/${sid}/lists/${lid}/items/${itemId}/fields`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        StatutId: s.id,
+        Label:    s.label,
+        Icon:     s.icon,
+        Color:    s.color,
+        Category: s.category,
+        Ordre:    Number(s.ordre) || 0,
+        Actif:    s.actif !== false,
+      }),
+    });
+  }
+
+  async deleteStatut(itemId) {
+    const sid = await this._siteIdCached();
+    const lid = await this._listIdForName(CONFIG.SHAREPOINT_LIST_STATUTS);
+    return this._call(`/sites/${sid}/lists/${lid}/items/${itemId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // ── MODIFICATIONS DE POINTAGES ────────────────────────────────────────────
+  async createModification(data) {
+    const sid = await this._siteIdCached();
+    const lid = await this._listIdForName(CONFIG.SHAREPOINT_LIST_MODIFICATIONS);
+    return this._call(`/sites/${sid}/lists/${lid}/items`, {
+      method: 'POST',
+      body: JSON.stringify({
+        fields: {
+          PointageId:     String(data.pointageId),
+          EmployeEmail:   data.email,
+          EmployeNom:     data.nom,
+          AncienStatut:   data.ancienStatut,
+          NouveauStatut:  data.nouveauStatut,
+          AncienneHeure:  new Date(data.ancienneHeure).toISOString(),
+          NouvelleHeure:  new Date(data.nouvelleHeure).toISOString(),
+          Motif:          data.motif || '',
+          Statut:         'En attente',
+          DateSoumission: new Date().toISOString(),
+        },
+      }),
+    });
+  }
+
+  async getMesModifications(email) {
+    const sid = await this._siteIdCached();
+    const lid = await this._listIdForName(CONFIG.SHAREPOINT_LIST_MODIFICATIONS);
+    const filter = encodeURIComponent(`fields/EmployeEmail eq '${email}'`);
+    const d = await this._call(`/sites/${sid}/lists/${lid}/items?$filter=${filter}&$expand=fields&$orderby=fields/DateSoumission desc&$top=200`);
+    return (d.value || []).map(i => ({ id: i.id, ...i.fields }));
+  }
+
+  async getAllModifications() {
+    const sid = await this._siteIdCached();
+    const lid = await this._listIdForName(CONFIG.SHAREPOINT_LIST_MODIFICATIONS);
+    const d = await this._call(`/sites/${sid}/lists/${lid}/items?$expand=fields&$orderby=fields/DateSoumission desc&$top=500`);
+    return (d.value || []).map(i => ({ id: i.id, ...i.fields }));
+  }
+
+  async updateModificationStatut(id, { statut, approbateur, notes }) {
+    const sid = await this._siteIdCached();
+    const lid = await this._listIdForName(CONFIG.SHAREPOINT_LIST_MODIFICATIONS);
+    return this._call(`/sites/${sid}/lists/${lid}/items/${id}/fields`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        Statut:           statut,
+        DateDecision:     new Date().toISOString(),
+        Approbateur:      approbateur || '',
+        NotesApprobateur: notes || '',
+      }),
+    });
+  }
+
+  async updatePointage(pointageId, fields) {
+    const sid = await this._siteIdCached();
+    const lid = await this._listIdCached(); // liste principale Presences_Employes
+    return this._call(`/sites/${sid}/lists/${lid}/items/${pointageId}/fields`, {
+      method: 'PATCH',
+      body: JSON.stringify(fields),
+    });
+  }
 }
 
 const Graph = new GraphAPI();

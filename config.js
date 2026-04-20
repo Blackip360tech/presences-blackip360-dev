@@ -30,6 +30,8 @@ const CONFIG = {
   SHAREPOINT_LIST:          'Presences_Employes' + SP_SUFFIX,
   SHAREPOINT_LIST_SOLDES:   'Soldes_Conges'      + SP_SUFFIX,
   SHAREPOINT_LIST_DEMANDES: 'Demandes_Conges'    + SP_SUFFIX,
+  SHAREPOINT_LIST_STATUTS:        'Statuts_Config'          + SP_SUFFIX,
+  SHAREPOINT_LIST_MODIFICATIONS:  'Modifications_Pointages' + SP_SUFFIX,
 
   // ── Graph API ─────────────────────────────────────────────────────────────
   GRAPH_BASE: 'https://graph.microsoft.com/v1.0',
