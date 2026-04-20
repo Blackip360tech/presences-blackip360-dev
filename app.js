@@ -301,7 +301,18 @@ const App = {
           </div>
 
           <div class="dem-list-card">
-            <h3>📋 Mes demandes récentes</h3>
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px">
+              <h3 style="margin:0">📋 Mes demandes récentes</h3>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <input type="text" id="demFilterType" placeholder="Type…" style="padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.82rem;width:120px" list="demTypesList">
+                <datalist id="demTypesList">
+                  ${CONFIG.TYPES_CONGE.map(t => `<option value="${t.label}">`).join('')}
+                </datalist>
+                <input type="date" id="demFilterFrom" class="dem-date-filter" title="Du" style="padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.82rem">
+                <input type="date" id="demFilterTo"   class="dem-date-filter" title="Au" style="padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.82rem">
+                <button class="btn-secondary" id="demFilterClear" style="padding:6px 10px;font-size:.82rem">Effacer</button>
+              </div>
+            </div>
             <div id="demMesListe">
               ${this._renderDemandesListe(mesDemandes, false)}
             </div>
@@ -311,23 +322,21 @@ const App = {
         ${this.isAdmin ? `
           <h2 style="margin-top:28px">👥 Gestion des demandes — Admin</h2>
           <div class="dem-list-card">
-            <h3>⏳ Demandes en attente (${attente.length})</h3>
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px">
+              <h3 style="margin:0">⏳ Demandes en attente (${attente.length})</h3>
+            </div>
             <div id="demAdminListe">
               ${this._renderDemandesListe(attente, true)}
             </div>
           </div>
 
           <div class="dem-list-card" style="margin-top:16px">
-            <h3>📜 Historique de toutes les demandes</h3>
-            <div id="demAdminHistorique">
-              ${this._renderDemandesListe(toutesDemandes.filter(d => d.Statut !== 'En attente'), false)}
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px">
+              <h3 style="margin:0">📜 Historique de toutes les demandes</h3>
             </div>
-          </div>
-
-          <h2 style="margin-top:28px">💰 Gestion des soldes</h2>
-          <div class="dem-list-card">
-            <h3>Modifier les soldes de vacances et de maladie</h3>
-            <div id="soldesAdminWrap"><div class="loading">Chargement…</div></div>
+            <div id="demAdminHistorique">
+              ${this._renderDemandesListe((toutesDemandes || []).filter(d => d.Statut !== 'En attente'), false)}
+            </div>
           </div>
         ` : ''}
       `;
@@ -340,8 +349,46 @@ const App = {
         el.querySelectorAll('[data-refuse]').forEach(btn =>
           btn.onclick = () => this._decideDemande(btn.dataset.refuse, 'Refusée')
         );
-        this._renderSoldesAdmin();
       }
+
+      // Filtres demandes
+      this._allDemandes = { mes: mesDemandes, admin: attente, hist: (toutesDemandes || []).filter(d => d.Statut !== 'En attente') };
+      const applyFilter = () => {
+        const ft = document.getElementById('demFilterType')?.value?.toLowerCase().trim() || '';
+        const fd = document.getElementById('demFilterFrom')?.value;
+        const ft2 = document.getElementById('demFilterTo')?.value;
+        const match = (list) => list.filter(d => {
+          if (ft && !(d.TypeConge || '').toLowerCase().includes(ft)) return false;
+          if (fd && new Date(d.DateFin) < new Date(fd + 'T00:00:00')) return false;
+          if (ft2 && new Date(d.DateDebut) > new Date(ft2 + 'T23:59:59')) return false;
+          return true;
+        });
+        const mesEl = document.getElementById('demMesListe');
+        if (mesEl) mesEl.innerHTML = this._renderDemandesListe(match(this._allDemandes.mes), false);
+        const admEl = document.getElementById('demAdminListe');
+        if (admEl) admEl.innerHTML = this._renderDemandesListe(match(this._allDemandes.admin), true);
+        const histEl = document.getElementById('demAdminHistorique');
+        if (histEl) histEl.innerHTML = this._renderDemandesListe(match(this._allDemandes.hist), false);
+        // Re-bind admin actions après rerender
+        if (this.isAdmin) {
+          document.querySelectorAll('[data-approve]').forEach(btn =>
+            btn.onclick = () => this._decideDemande(btn.dataset.approve, 'Approuvée')
+          );
+          document.querySelectorAll('[data-refuse]').forEach(btn =>
+            btn.onclick = () => this._decideDemande(btn.dataset.refuse, 'Refusée')
+          );
+        }
+      };
+      ['demFilterType', 'demFilterFrom', 'demFilterTo'].forEach(id => {
+        const e = document.getElementById(id);
+        if (e) e.oninput = e.onchange = applyFilter;
+      });
+      document.getElementById('demFilterClear')?.addEventListener('click', () => {
+        ['demFilterType', 'demFilterFrom', 'demFilterTo'].forEach(id => {
+          const e = document.getElementById(id); if (e) e.value = '';
+        });
+        applyFilter();
+      });
     } catch (err) {
       el.innerHTML = `<div class="error">Erreur : ${err.message}</div>`;
     }

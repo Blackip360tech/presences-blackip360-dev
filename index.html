@@ -853,17 +853,110 @@
     .perm-table td { padding: 10px 8px; }
 
     /* ── RESPONSIVE ─────────────────────────────────────────────────────── */
-    @media (max-width: 900px) {
-      header { flex-wrap: wrap; height: auto; padding: 10px 16px; gap: 12px; }
-      nav.tabs { order: 99; flex-basis: 100%; padding: 8px 0 0; }
-      .hdr-clock { font-size: .8rem; }
-      main { padding: 16px; }
+    @media (max-width: 1100px) {
+      .paye-filters { grid-template-columns: repeat(2, 1fr); }
     }
+
+    @media (max-width: 900px) {
+      header { flex-wrap: wrap; height: auto; padding: 10px 12px; gap: 10px; min-height: 60px; }
+      .hdr-brand { order: 1; }
+      .user-chip { order: 2; }
+      .hdr-clock { order: 3; flex-basis: 100%; text-align: center; }
+      nav.tabs { order: 99; flex-basis: 100%; padding: 8px 0 0; }
+      .hdr-clock { font-size: .72rem; }
+      main { padding: 14px; }
+      .paye-header { padding: 16px; }
+      .paye-actions { width: 100%; }
+      .paye-actions button { flex: 1; }
+      .paye-filters { grid-template-columns: 1fr 1fr; padding: 14px; }
+      .paye-presets { gap: 6px; }
+      .preset-btn { padding: 7px 12px; font-size: .78rem; }
+      .stat-row { grid-template-columns: repeat(2, 1fr); }
+      .statuts-grid { grid-template-columns: 1fr; }
+      .dem-grid { grid-template-columns: 1fr; }
+      .dem-field-row { grid-template-columns: 1fr; }
+      .solde-row { grid-template-columns: 1fr; }
+      .tv-totals { grid-template-columns: repeat(2, 1fr); }
+      .tv-cols { flex-direction: column; }
+      .tv-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    }
+
     @media (max-width: 640px) {
+      main { padding: 10px; }
+      header { padding: 8px 10px; gap: 8px; }
+      .hdr-logo-img { height: 32px !important; max-width: 140px !important; }
+      .hdr-brand { gap: 8px; }
+      .user-chip { padding: 4px 8px 4px 4px; }
       .user-details { display: none; }
-      .stat-card { padding: 16px 20px; }
-      .stat-card .stat-n { font-size: 1.8rem; }
-      .login-card { padding: 36px 24px; }
+      .user-avatar { width: 32px; height: 32px; font-size: .75rem; }
+      #logoutBtn { padding: 4px 10px; font-size: .72rem; }
+      nav.tabs { padding: 6px 0 0; gap: 2px; }
+      .tab-btn { padding: 7px 10px; font-size: .78rem; }
+      .hdr-clock { font-size: .68rem; line-height: 1.4; }
+      .hdr-clock > div { font-size: .68rem; }
+      .hdr-clock .mtr b, .hdr-clock .jp b { font-size: .75rem; }
+
+      h2 { font-size: 1.1rem; }
+      .login-card { padding: 32px 20px; }
+
+      .stat-row { grid-template-columns: 1fr 1fr; gap: 10px; }
+      .stat-card { padding: 14px 16px; }
+      .stat-card .stat-n { font-size: 1.5rem; }
+      .stat-card .stat-l { font-size: .65rem; }
+
+      .paye-header { flex-direction: column; gap: 10px; }
+      .paye-actions { display: flex; gap: 6px; }
+      .paye-actions .btn-primary, .paye-actions .btn-secondary { flex: 1; font-size: .78rem; padding: 7px 10px; }
+      .paye-presets { gap: 4px; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+      .preset-btn { padding: 6px 10px; font-size: .72rem; white-space: nowrap; }
+      .paye-filters { grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px; }
+      .paye-filters .field:last-child { grid-column: 1 / -1; }
+      .paye-filters label { font-size: .65rem; }
+      .paye-filters input, .paye-filters select { padding: 8px 10px; font-size: .82rem; }
+
+      .current-card { padding: 16px; gap: 12px; }
+      .current-icon { font-size: 2rem; }
+      .current-label { font-size: 1rem; }
+      .notes-row textarea { font-size: .85rem; }
+
+      .statut-btn { padding: 12px 14px; }
+      .sbtn-icon { font-size: 1.2rem; }
+      .sbtn-label { font-size: .85rem; }
+
+      .table-wrap { border-radius: 8px; }
+      thead th { padding: 8px 10px; font-size: .65rem; }
+      tbody td { padding: 10px; font-size: .82rem; }
+
+      .dem-form-card, .dem-list-card, .acces-card { padding: 16px; }
+      .dem-field input, .dem-field select, .dem-field textarea { font-size: .85rem; padding: 9px 12px; }
+      .dem-item { padding: 12px; }
+      .dem-item-hdr { gap: 6px; }
+      .dem-item-type { font-size: .82rem; }
+      .dem-item-dates { font-size: .78rem; }
+      .dem-admin-actions { flex-direction: column; }
+      .dem-admin-actions button { width: 100%; }
+
+      .solde-card .n { font-size: 1.5rem; }
+
+      .tv-totals { grid-template-columns: 1fr 1fr; gap: 10px; }
+      .tv-totals .tv-n { font-size: 1.8rem; }
+      .tv-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+      .tv-card { padding: 12px; }
+      .tv-name { font-size: .8rem; }
+      .tv-dept { font-size: .65rem; }
+
+      .paye-table .emp-col { min-width: 180px; }
+      .perm-table th { font-size: .6rem; padding: 8px 6px; }
+      .perm-table td { padding: 8px 6px; }
+
+      .paye-legend { padding: 10px 14px; font-size: .75rem; gap: 12px; }
+    }
+
+    @media (max-width: 420px) {
+      .stat-row { grid-template-columns: 1fr; }
+      .tv-totals { grid-template-columns: 1fr; }
+      .paye-filters { grid-template-columns: 1fr; }
+      .tv-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -939,10 +1032,10 @@
 <div id="toast"></div>
 
 <!-- Scripts (ordre important) -->
-<script src="config.js?v=31"></script>
-<script src="auth.js?v=31"></script>
-<script src="graph.js?v=31"></script>
-<script src="app.js?v=31"></script>
+<script src="config.js?v=32"></script>
+<script src="auth.js?v=32"></script>
+<script src="graph.js?v=32"></script>
+<script src="app.js?v=32"></script>
 
 </body>
 </html>
