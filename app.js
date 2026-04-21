@@ -977,7 +977,7 @@ document.getElementById('notesInput')?.classList.remove('input-error');
 
   _calculateDayHours(entries) {
     const m = this._calculateDayMinutes(entries);
-    return Math.round(m.total / 6) / 10; // arrondi à 0.1h près
+    return Math.round(m.total / 60 * 10) / 10; // arrondi à 0.1h près
   },
 
   // Initialise un calendrier Flatpickr sur un champ date
@@ -1877,7 +1877,7 @@ _renderAdminHeader(statuses) {
 
       // Totaux par jour
       const totByDay = days.map((_, i) => rows.reduce((s, r) => s + r.dayStates[i].hours, 0));
-      const grandTotal = totByDay.reduce((a,b) => a+b, 0);
+      const grandTotal = Math.round(totByDay.reduce((a,b) => a+b, 0) * 10) / 10;
 
       result.innerHTML = `
         <div class="stat-row" style="margin-bottom:20px">
@@ -1904,7 +1904,7 @@ _renderAdminHeader(statuses) {
             <tfoot>
               <tr>
                 <td class="emp-col"><strong>TOTAL</strong></td>
-                ${totByDay.map((t, i) => `<td class="day${isWeekend(days[i]) ? ' day-we' : ''}">${t || ''}</td>`).join('')}
+                ${totByDay.map((t, i) => `<td class="day${isWeekend(days[i]) ? ' day-we' : ''}">${t ? (Math.round(t * 10) / 10) : ''}</td>`).join('')}
                 <td class="day tot-cell">${grandTotal} h</td>
                 <td class="day"></td>
                 <td class="day"></td>
