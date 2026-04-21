@@ -1287,10 +1287,19 @@ const App = {
         : new Date(heureStr).toISOString();
 
       // Bloquer si aucune modification réelle (même statut + même heure)
-      if (nouveauStatut === statutActuel && nouvelleHeureISO === heureActuelle) {
-        this.showToast('Aucune modification — ajustez le statut ou l\'heure', 'error');
-        return;
-      }
+if (nouveauStatut === statutActuel && nouvelleHeureISO === heureActuelle) {
+  let errEl = document.getElementById('modErrMsg');
+  if (!errEl) {
+    errEl = document.createElement('div');
+    errEl.id = 'modErrMsg';
+    errEl.style.cssText = 'background:rgba(248,81,73,.15);border:1px solid #f85149;color:#fca5a5;border-radius:8px;padding:12px 16px;font-size:.88rem;font-weight:600;margin-bottom:12px;text-align:center;animation:shake .3s ease';
+    const submitBtn = document.getElementById('modSubmit');
+    submitBtn.parentElement.before(errEl);
+  }
+  errEl.textContent = '⚠️ Aucune modification — ajustez le statut ou l\'heure';
+  this.showToast('Aucune modification — ajustez le statut ou l\'heure', 'error');
+  return;
+}
 
       const btn = document.getElementById('modSubmit');
       btn.disabled = true; btn.textContent = 'Envoi…';
