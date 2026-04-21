@@ -409,6 +409,16 @@
       gap: 10px;
       margin-bottom: 32px;
     }
+    .statuts-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 32px;
+    }
+    .statuts-col { display: flex; flex-direction: column; gap: 10px; }
+    @media (max-width: 640px) {
+      .statuts-2col { grid-template-columns: 1fr; }
+    }
     .statut-btn {
       display: flex;
       align-items: center;
@@ -1058,10 +1068,10 @@
 <div id="toast"></div>
 
 <!-- Scripts (ordre important) -->
-<script src="config.js?v=41"></script>
-<script src="auth.js?v=41"></script>
-<script src="graph.js?v=41"></script>
-<script src="app.js?v=41"></script>
+<script src="config.js?v=42"></script>
+<script src="auth.js?v=42"></script>
+<script src="graph.js?v=42"></script>
+<script src="app.js?v=42"></script>
 
 </body>
 </html>

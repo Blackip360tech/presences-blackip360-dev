@@ -220,15 +220,27 @@ const App = {
         </div>
 
         <h3>Changer mon statut</h3>
-        <div class="statuts-grid">
-          ${CONFIG.STATUTS.map(s => `
-            <button class="statut-btn ${s.category} ${current?.StatutActuel === s.label ? 'selected' : ''}"
-                    data-statut="${s.label}"
-                    style="--c: ${s.color}">
-              <span class="sbtn-icon">${s.icon}</span>
-              <span class="sbtn-label">${s.label}</span>
-            </button>
-          `).join('')}
+        <div class="statuts-2col">
+          <div class="statuts-col">
+            ${CONFIG.STATUTS.filter(s => s.category === 'present').map(s => `
+              <button class="statut-btn present ${current?.StatutActuel === s.label ? 'selected' : ''}"
+                      data-statut="${s.label}"
+                      style="--c: ${s.color}">
+                <span class="sbtn-icon">${s.icon}</span>
+                <span class="sbtn-label">${s.label}</span>
+              </button>
+            `).join('')}
+          </div>
+          <div class="statuts-col">
+            ${CONFIG.STATUTS.filter(s => s.category === 'absent').map(s => `
+              <button class="statut-btn absent ${current?.StatutActuel === s.label ? 'selected' : ''}"
+                      data-statut="${s.label}"
+                      style="--c: ${s.color}">
+                <span class="sbtn-icon">${s.icon}</span>
+                <span class="sbtn-label">${s.label}</span>
+              </button>
+            `).join('')}
+          </div>
         </div>
 
       </div>`;
@@ -972,7 +984,8 @@ const App = {
   _loadRapport() {
     const el = document.getElementById('tab-rapport');
     const today = new Date();
-    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const monday = new Date(today); monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+    const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
     const fmt = d => d.toISOString().slice(0, 10);
 
     el.innerHTML = `
@@ -989,10 +1002,10 @@ const App = {
 
       <div class="paye-presets">
         <button class="preset-btn" data-preset="today">Aujourd'hui</button>
-        <button class="preset-btn" data-preset="week">Cette semaine</button>
+        <button class="preset-btn active" data-preset="week">Cette semaine</button>
         <button class="preset-btn" data-preset="lastweek">Semaine dernière</button>
         <button class="preset-btn" data-preset="2weeks">2 dernières semaines</button>
-        <button class="preset-btn active" data-preset="month">Ce mois</button>
+        <button class="preset-btn" data-preset="month">Ce mois</button>
         <button class="preset-btn" data-preset="lastmonth">Mois dernier</button>
         <button class="preset-btn" data-preset="year">Cette année</button>
       </div>
@@ -1000,11 +1013,11 @@ const App = {
       <div class="paye-filters">
         <div class="field">
           <label>📅 Du</label>
-          <input type="date" id="rapFrom" value="${fmt(monthStart)}">
+          <input type="date" id="rapFrom" value="${fmt(monday)}">
         </div>
         <div class="field">
           <label>📅 Au</label>
-          <input type="date" id="rapTo" value="${fmt(today)}">
+          <input type="date" id="rapTo" value="${fmt(sunday)}">
         </div>
         <div class="field">
           <label>&nbsp;</label>
@@ -1034,8 +1047,10 @@ const App = {
           from = new Date(n); from.setDate(n.getDate() - ((n.getDay() + 6) % 7) - 7);
           to = new Date(from); to.setDate(from.getDate() + 6);
         } else if (preset === '2weeks') {
-          to = new Date(n);
-          from = new Date(n); from.setDate(n.getDate() - 13);
+          // 2 semaines complètes AVANT la semaine en cours
+          const thisMonday = new Date(n); thisMonday.setDate(n.getDate() - ((n.getDay() + 6) % 7));
+          to = new Date(thisMonday); to.setDate(thisMonday.getDate() - 1);
+          from = new Date(to); from.setDate(to.getDate() - 13);
         } else if (preset === 'month') {
           from = new Date(n.getFullYear(), n.getMonth(), 1);
           to   = new Date(n.getFullYear(), n.getMonth() + 1, 0);
@@ -1218,6 +1233,11 @@ const App = {
   },
 
   _openModifPointageForm(pointageId, statutActuel, heureActuelle) {
+    // Format ISO local (YYYY-MM-DDTHH:MM) en gardant la timezone locale
+    const d = new Date(heureActuelle);
+    const pad = n => String(n).padStart(2, '0');
+    const localISO = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px';
@@ -1235,7 +1255,7 @@ const App = {
 
         <div style="margin-bottom:14px">
           <label style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;display:block;margin-bottom:6px">Nouvelle date / heure</label>
-          <input type="datetime-local" id="modHeure" value="${new Date(heureActuelle).toISOString().slice(0, 16)}" style="width:100%;padding:10px 14px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:.9rem">
+          <input type="datetime-local" id="modHeure" value="${localISO}" data-initial="${localISO}" style="width:100%;padding:10px 14px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:.9rem">
         </div>
 
         <div style="margin-bottom:18px">
@@ -1259,7 +1279,18 @@ const App = {
       const motif = document.getElementById('modMotif').value.trim();
       if (!motif) { this.showToast('Motif requis', 'error'); return; }
       const nouveauStatut = document.getElementById('modStatut').value;
-      const nouvelleHeure = document.getElementById('modHeure').value;
+      const heureInput = document.getElementById('modHeure');
+      const heureStr = heureInput.value;
+      // Si le champ est vide ou n'a pas changé → garder l'heure originale exacte (en ISO UTC)
+      const nouvelleHeureISO = (!heureStr || heureStr === heureInput.dataset.initial)
+        ? heureActuelle
+        : new Date(heureStr).toISOString();
+
+      // Bloquer si aucune modification réelle (même statut + même heure)
+      if (nouveauStatut === statutActuel && nouvelleHeureISO === heureActuelle) {
+        this.showToast('Aucune modification — ajustez le statut ou l\'heure', 'error');
+        return;
+      }
 
       const btn = document.getElementById('modSubmit');
       btn.disabled = true; btn.textContent = 'Envoi…';
@@ -1271,7 +1302,7 @@ const App = {
           ancienStatut:  statutActuel,
           nouveauStatut,
           ancienneHeure: heureActuelle,
-          nouvelleHeure,
+          nouvelleHeure: nouvelleHeureISO,
           motif,
         });
         this.showToast('Demande soumise ✓', 'success');
@@ -1289,10 +1320,10 @@ const App = {
     const el = document.getElementById('tab-admin');
     el.innerHTML = '<div class="loading">Chargement des présences…</div>';
     try {
-      const [statuses, soldes, toutesDemandes] = await Promise.all([
+      // PHASE 1 : afficher les statuts rapidement
+      const [statuses, soldes] = await Promise.all([
         Graph.getCurrentStatuses(),
         Graph.getAllSoldes().catch(() => []),
-        this.perms?.canApprouver ? Graph.getAllDemandes().catch(() => []) : Promise.resolve([]),
       ]);
       const soldeMap = Object.fromEntries(soldes.map(s => [s.email?.toLowerCase(), s]));
       this.currentStatuses = statuses.map(p => ({
@@ -1300,39 +1331,48 @@ const App = {
         Departement: soldeMap[p.EmployeEmail?.toLowerCase()]?.departement || p.Departement,
       }));
 
-      const attente = toutesDemandes.filter(d => d.Statut === 'En attente');
-      const historique = toutesDemandes.filter(d => d.Statut !== 'En attente');
+      const approvalsPlaceholder = this.perms?.canApprouver ? `
+        <h2 style="margin-top:28px">👥 Gestion des demandes — En attente</h2>
+        <div class="dem-list-card"><div id="adminDemListe"><div class="loading">Chargement des demandes…</div></div></div>
 
-      let approvalsHTML = '';
-      if (this.perms?.canApprouver) {
-        approvalsHTML = `
-          <h2 style="margin-top:28px">👥 Gestion des demandes — En attente (${attente.length})</h2>
-          <div class="dem-list-card">
-            <div id="adminDemListe">${this._renderDemandesListe(attente, true)}</div>
-          </div>
+        <h2 style="margin-top:28px">✏️ Modifications de pointages — En attente</h2>
+        <div class="dem-list-card"><div id="modifPointagesWrap"><div class="loading">Chargement…</div></div></div>
 
-          <h2 style="margin-top:28px">✏️ Modifications de pointages — En attente</h2>
-          <div class="dem-list-card">
-            <div id="modifPointagesWrap"><div class="loading">Chargement…</div></div>
-          </div>
+        <details style="margin-top:16px" class="dem-list-card" id="adminHistDetails">
+          <summary style="cursor:pointer;font-weight:600;color:var(--muted);font-size:.82rem;text-transform:uppercase;letter-spacing:.5px">📜 Historique des demandes</summary>
+          <div id="adminDemHistorique" style="margin-top:14px"><div class="loading">…</div></div>
+        </details>
+      ` : '';
 
-          <details style="margin-top:16px" class="dem-list-card">
-            <summary style="cursor:pointer;font-weight:600;color:var(--muted);font-size:.82rem;text-transform:uppercase;letter-spacing:.5px">📜 Historique des demandes (${historique.length})</summary>
-            <div style="margin-top:14px">${this._renderDemandesListe(historique, false)}</div>
-          </details>
-        `;
-      }
-
-      el.innerHTML = this._renderAdmin(this.currentStatuses) + approvalsHTML;
+      el.innerHTML = this._renderAdmin(this.currentStatuses) + approvalsPlaceholder;
       this._bindAdminFilters();
 
+      // PHASE 2 : charger les approbations en arrière-plan
       if (this.perms?.canApprouver) {
-        el.querySelectorAll('[data-approve]').forEach(btn =>
-          btn.onclick = () => this._decideDemande(btn.dataset.approve, 'Approuvée')
-        );
-        el.querySelectorAll('[data-refuse]').forEach(btn =>
-          btn.onclick = () => this._decideDemande(btn.dataset.refuse, 'Refusée')
-        );
+        Graph.getAllDemandes().then(toutesDemandes => {
+          const attente    = (toutesDemandes || []).filter(d => (d.Statut || '').trim() === 'En attente');
+          const historique = (toutesDemandes || []).filter(d => (d.Statut || '').trim() && (d.Statut || '').trim() !== 'En attente');
+
+          const demEl  = document.getElementById('adminDemListe');
+          const histEl = document.getElementById('adminDemHistorique');
+          const detEl  = document.getElementById('adminHistDetails');
+          if (demEl)  demEl.innerHTML  = this._renderDemandesListe(attente, true);
+          if (histEl) histEl.innerHTML = this._renderDemandesListe(historique, false);
+          if (detEl)  detEl.querySelector('summary').innerHTML = `📜 Historique des demandes (${historique.length})`;
+          const titleH2 = el.querySelector('h2[style*="margin-top:28px"]');
+          if (titleH2) titleH2.textContent = `👥 Gestion des demandes — En attente (${attente.length})`;
+
+          el.querySelectorAll('[data-approve]').forEach(btn =>
+            btn.onclick = () => this._decideDemande(btn.dataset.approve, 'Approuvée')
+          );
+          el.querySelectorAll('[data-refuse]').forEach(btn =>
+            btn.onclick = () => this._decideDemande(btn.dataset.refuse, 'Refusée')
+          );
+        }).catch(err => {
+          const demEl = document.getElementById('adminDemListe');
+          if (demEl) demEl.innerHTML = `<div class="error">Erreur : ${err.message}</div>`;
+        });
+
         this._renderModifPointagesAdmin();
       }
     } catch (err) {
@@ -1627,8 +1667,10 @@ const App = {
           from = new Date(n); from.setDate(n.getDate() - ((n.getDay() + 6) % 7) - 7);
           to = new Date(from); to.setDate(from.getDate() + 6);
         } else if (preset === '2weeks') {
-          to = new Date(n);
-          from = new Date(n); from.setDate(n.getDate() - 13);
+          // 2 semaines complètes AVANT la semaine en cours
+          const thisMonday = new Date(n); thisMonday.setDate(n.getDate() - ((n.getDay() + 6) % 7));
+          to = new Date(thisMonday); to.setDate(thisMonday.getDate() - 1);
+          from = new Date(to); from.setDate(to.getDate() - 13);
         } else if (preset === 'month') {
           from = new Date(n.getFullYear(), n.getMonth(), 1);
           to   = new Date(n.getFullYear(), n.getMonth() + 1, 0);
