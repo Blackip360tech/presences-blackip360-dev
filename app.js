@@ -276,13 +276,10 @@ const App = {
     const el = document.getElementById('tab-demandes');
     el.innerHTML = '<div class="loading">Chargement…</div>';
     try {
-      const [solde, mesDemandes, toutesDemandes] = await Promise.all([
+      const [solde, mesDemandes] = await Promise.all([
         Graph.getSolde(this.user.email),
         Graph.getMesDemandes(this.user.email),
-        this.isAdmin ? Graph.getAllDemandes() : Promise.resolve(null),
       ]);
-
-      const attente = toutesDemandes ? toutesDemandes.filter(d => d.Statut === 'En attente') : [];
 
       el.innerHTML = `
         <h2>🏖️ Mes demandes de congé</h2>
@@ -347,46 +344,12 @@ const App = {
           </div>
         </div>
 
-        ${this.isAdmin ? `
-          <h2 style="margin-top:28px">👥 Gestion des demandes — Admin</h2>
-          <div class="dem-list-card">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px">
-              <h3 style="margin:0">⏳ Demandes en attente (${attente.length})</h3>
-            </div>
-            <div id="demAdminListe">
-              ${this._renderDemandesListe(attente, true)}
-            </div>
-          </div>
-
-          <div class="dem-list-card" style="margin-top:16px">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px">
-              <h3 style="margin:0">📜 Historique de toutes les demandes</h3>
-            </div>
-            <div id="demAdminHistorique">
-              ${this._renderDemandesListe((toutesDemandes || []).filter(d => d.Statut !== 'En attente'), false)}
-            </div>
-          </div>
-
-          <h2 style="margin-top:28px">✏️ Modifications de pointages — En attente</h2>
-          <div class="dem-list-card">
-            <div id="modifPointagesWrap"><div class="loading">Chargement…</div></div>
-          </div>
-        ` : ''}
       `;
 
       document.getElementById('demSubmit').onclick = () => this._submitDemande();
-      if (this.isAdmin) {
-        el.querySelectorAll('[data-approve]').forEach(btn =>
-          btn.onclick = () => this._decideDemande(btn.dataset.approve, 'Approuvée')
-        );
-        el.querySelectorAll('[data-refuse]').forEach(btn =>
-          btn.onclick = () => this._decideDemande(btn.dataset.refuse, 'Refusée')
-        );
-        this._renderModifPointagesAdmin();
-      }
 
       // Filtres demandes
-      this._allDemandes = { mes: mesDemandes, admin: attente, hist: (toutesDemandes || []).filter(d => d.Statut !== 'En attente') };
+      this._allDemandes = { mes: mesDemandes };
       const applyFilter = () => {
         const ft = document.getElementById('demFilterType')?.value?.toLowerCase().trim() || '';
         const fd = document.getElementById('demFilterFrom')?.value;
@@ -399,19 +362,6 @@ const App = {
         });
         const mesEl = document.getElementById('demMesListe');
         if (mesEl) mesEl.innerHTML = this._renderDemandesListe(match(this._allDemandes.mes), false);
-        const admEl = document.getElementById('demAdminListe');
-        if (admEl) admEl.innerHTML = this._renderDemandesListe(match(this._allDemandes.admin), true);
-        const histEl = document.getElementById('demAdminHistorique');
-        if (histEl) histEl.innerHTML = this._renderDemandesListe(match(this._allDemandes.hist), false);
-        // Re-bind admin actions après rerender
-        if (this.isAdmin) {
-          document.querySelectorAll('[data-approve]').forEach(btn =>
-            btn.onclick = () => this._decideDemande(btn.dataset.approve, 'Approuvée')
-          );
-          document.querySelectorAll('[data-refuse]').forEach(btn =>
-            btn.onclick = () => this._decideDemande(btn.dataset.refuse, 'Refusée')
-          );
-        }
       };
       ['demFilterType', 'demFilterFrom', 'demFilterTo'].forEach(id => {
         const e = document.getElementById(id);
@@ -522,7 +472,9 @@ const App = {
       }
 
       this.showToast(`Demande ${statut.toLowerCase()} ✓`, 'success');
-      await this._loadDemandes();
+      // Refresh l'onglet actif
+      if (this.activeTab === 'admin') await this._loadAdmin();
+      else await this._loadDemandes();
     } catch (err) {
       this.showToast('Erreur : ' + err.message, 'error');
     }
@@ -590,7 +542,8 @@ const App = {
         notes: notes || '',
       });
       this.showToast(`Modification ${statut.toLowerCase()} ✓`, 'success');
-      await this._loadDemandes();
+      if (this.activeTab === 'admin') await this._loadAdmin();
+      else await this._loadDemandes();
     } catch (err) {
       this.showToast('Erreur : ' + err.message, 'error');
     }
@@ -1336,17 +1289,52 @@ const App = {
     const el = document.getElementById('tab-admin');
     el.innerHTML = '<div class="loading">Chargement des présences…</div>';
     try {
-      const [statuses, soldes] = await Promise.all([
+      const [statuses, soldes, toutesDemandes] = await Promise.all([
         Graph.getCurrentStatuses(),
         Graph.getAllSoldes().catch(() => []),
+        this.perms?.canApprouver ? Graph.getAllDemandes().catch(() => []) : Promise.resolve([]),
       ]);
       const soldeMap = Object.fromEntries(soldes.map(s => [s.email?.toLowerCase(), s]));
       this.currentStatuses = statuses.map(p => ({
         ...p,
         Departement: soldeMap[p.EmployeEmail?.toLowerCase()]?.departement || p.Departement,
       }));
-      el.innerHTML = this._renderAdmin(this.currentStatuses);
+
+      const attente = toutesDemandes.filter(d => d.Statut === 'En attente');
+      const historique = toutesDemandes.filter(d => d.Statut !== 'En attente');
+
+      let approvalsHTML = '';
+      if (this.perms?.canApprouver) {
+        approvalsHTML = `
+          <h2 style="margin-top:28px">👥 Gestion des demandes — En attente (${attente.length})</h2>
+          <div class="dem-list-card">
+            <div id="adminDemListe">${this._renderDemandesListe(attente, true)}</div>
+          </div>
+
+          <h2 style="margin-top:28px">✏️ Modifications de pointages — En attente</h2>
+          <div class="dem-list-card">
+            <div id="modifPointagesWrap"><div class="loading">Chargement…</div></div>
+          </div>
+
+          <details style="margin-top:16px" class="dem-list-card">
+            <summary style="cursor:pointer;font-weight:600;color:var(--muted);font-size:.82rem;text-transform:uppercase;letter-spacing:.5px">📜 Historique des demandes (${historique.length})</summary>
+            <div style="margin-top:14px">${this._renderDemandesListe(historique, false)}</div>
+          </details>
+        `;
+      }
+
+      el.innerHTML = this._renderAdmin(this.currentStatuses) + approvalsHTML;
       this._bindAdminFilters();
+
+      if (this.perms?.canApprouver) {
+        el.querySelectorAll('[data-approve]').forEach(btn =>
+          btn.onclick = () => this._decideDemande(btn.dataset.approve, 'Approuvée')
+        );
+        el.querySelectorAll('[data-refuse]').forEach(btn =>
+          btn.onclick = () => this._decideDemande(btn.dataset.refuse, 'Refusée')
+        );
+        this._renderModifPointagesAdmin();
+      }
     } catch (err) {
       el.innerHTML = `<div class="error"><strong>Erreur :</strong> ${err.message}</div>`;
     }
@@ -1454,7 +1442,7 @@ const App = {
     const jpD  = now.toLocaleDateString('fr-CA', { timeZone: 'Asia/Tokyo',     weekday:'long', day:'numeric', month:'long', year:'numeric' });
     el.innerHTML = `
       <div class="line-mtr"><span class="city"><img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f1e8-1f1e6.png" class="flag flag-lg" alt="CA"> Montréal</span> <span class="time">${mtrT}</span> <span class="date">${mtrD}</span></div>
-      <div class="line-jp"><span class="city"><img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f1ef-1f1f5.png" class="flag flag-lg" alt="JP"> Tokyo</span> <span class="time">${jpT}</span> <span class="date">${jpD}</span></div>
+      <div class="line-jp"><span class="city"><img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f1ef-1f1f5.png" class="flag flag-lg" alt="JP"> Japon</span> <span class="time">${jpT}</span> <span class="date">${jpD}</span></div>
     `;
   },
 
@@ -1990,7 +1978,7 @@ const App = {
       const jpD  = now.toLocaleDateString('fr-CA', { timeZone: 'Asia/Tokyo',     weekday:'short', day:'numeric', month:'short' });
       el.innerHTML = `
         <div class="mtr"><img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f1e8-1f1e6.png" class="flag" alt="CA"> Montréal · <b>${mtrT}</b> · ${mtrD}</div>
-        <div class="jp"><img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f1ef-1f1f5.png" class="flag" alt="JP"> Tokyo · <b>${jpT}</b> · ${jpD}</div>
+        <div class="jp"><img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f1ef-1f1f5.png" class="flag" alt="JP"> Japon · <b>${jpT}</b> · ${jpD}</div>
       `;
     };
     tick();

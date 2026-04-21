@@ -39,9 +39,10 @@ const CONFIG = {
 
   // Types de congé
   TYPES_CONGE: [
-    { id: 'vacances',   label: 'Vacances',   icon: '🌴', color: '#293af2' },
-    { id: 'sans_solde', label: 'Sans solde', icon: '📋', color: '#7d8590' },
-    { id: 'maladie',    label: 'Maladie',    icon: '🤒', color: '#f85149' },
+    { id: 'vacances',     label: 'Vacances',     icon: '🌴', color: '#293af2' },
+    { id: 'teletravail',  label: 'Télé-Travail', icon: '🏠', color: '#0dcaf0' },
+    { id: 'sans_solde',   label: 'Sans solde',   icon: '📋', color: '#7d8590' },
+    { id: 'maladie',      label: 'Maladie',      icon: '🤒', color: '#f85149' },
   ],
 
   // ── Teams ─────────────────────────────────────────────────────────────────
