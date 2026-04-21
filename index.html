@@ -417,7 +417,10 @@
       border-color: var(--primary);
       box-shadow: 0 0 0 3px rgba(41,58,242,.15);
     }
-
+.notes-row textarea.input-error {
+  border-color: #f85149;
+  box-shadow: 0 0 0 3px rgba(248,81,73,.2);
+}
     .statuts-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -635,6 +638,7 @@
       width: 100%;
       text-align: center;
     }
+    .tv-note { font-size: .72rem; color: var(--warning); font-style: italic; margin-bottom: 4px; background: var(--warning-bg); border-radius: 4px; padding: 3px 8px; }
     .tv-time { font-size: .7rem; color: var(--muted); font-family: var(--mono); }
     .tv-error  { color: var(--danger); text-align: center; padding: 40px; }
 
@@ -1022,6 +1026,13 @@
 
       .paye-legend { padding: 10px 14px; font-size: .75rem; gap: 12px; }
     }
+    @keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-7px); }
+  40%       { transform: translateX(7px); }
+  60%       { transform: translateX(-4px); }
+  80%       { transform: translateX(4px); }
+}
 
     @media (max-width: 420px) {
       .stat-row { grid-template-columns: 1fr; }
@@ -1067,7 +1078,7 @@
       <button class="tab-btn" data-tab="demandes">🏖️ Mes demandes</button>
     <button class="tab-btn" data-tab="rapport">📊 Mon rapport</button>
       <button class="tab-btn" data-tab="admin" data-perm="canAdmin">👥 Admin</button>
-      <button class="tab-btn" data-tab="tv"    data-perm="canTV">📺 Affichage TV</button>
+      <button class="tab-btn" data-tab="tv"    data-perm="canTV">📺 Dashboard</button>
       <button class="tab-btn" data-tab="paye"  data-perm="canPaye">💰 Rapport paye</button>
       <button class="tab-btn" data-tab="acces" data-perm="canAcces">🔑 Accès</button>
     </nav>

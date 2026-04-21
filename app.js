@@ -112,7 +112,7 @@ const App = {
     } else {
       // Utilisateur normal sans entrée Soldes : aucune permission admin
       this.perms = {
-        canAdmin: false, canTV: false, canPaye: false, canAcces: false, canApprouver: false,
+        canAdmin: false, canTV: true, canPaye: false, canAcces: false, canApprouver: false,
       };
     }
     this.isAdmin = this.perms.canAdmin || this.perms.canTV || this.perms.canPaye || this.perms.canAcces || this.perms.canApprouver;
@@ -220,7 +220,7 @@ const App = {
         </div>
 
         <div class="notes-row">
-          <textarea id="notesInput" placeholder="Note optionnelle (visible par les admins)…" maxlength="200"></textarea>
+          <textarea id="notesInput" placeholder="Note optionnelle — requise uniquement pour les statuts de déplacement" maxlength="200"></textarea>
         </div>
 
         <h3>Changer mon statut</h3>
@@ -258,11 +258,25 @@ const App = {
         const needsNote = statutCfg && (statutCfg.id === 'route_bip' || statutCfg.id === 'route_cv247');
         const notesEl = document.getElementById('notesInput');
         const notesValue = notesEl?.value?.trim() || '';
-        if (needsNote && !notesValue) {
-          this.showToast('Une note est obligatoire pour ce statut (indiquer le client).', 'error');
-          notesEl?.focus();
-          return;
-        }
+if (needsNote && !notesValue) {
+  let errBanner = document.getElementById('noteErrBanner');
+  if (!errBanner) {
+    errBanner = document.createElement('div');
+    errBanner.id = 'noteErrBanner';
+    errBanner.style.cssText = 'background:rgba(248,81,73,.15);border:2px solid #f85149;color:#fca5a5;border-radius:8px;padding:10px 14px;font-size:.88rem;font-weight:600;margin-top:8px;text-align:center;animation:shake .3s ease';
+    notesEl?.parentElement?.after(errBanner);
+  } else {
+    errBanner.style.animation = 'none';
+    errBanner.offsetHeight;
+    errBanner.style.animation = 'shake .3s ease';
+  }
+  errBanner.textContent = '⚠️ Une note est obligatoire pour ce statut — indiquez le client.';
+  notesEl?.focus();
+  notesEl?.classList.add('input-error');
+  return;
+}
+document.getElementById('noteErrBanner')?.remove();
+document.getElementById('notesInput')?.classList.remove('input-error');
         await this._setStatut(statutLabel, notesValue);
       });
     });
@@ -967,7 +981,7 @@ const App = {
 
   _calculateDayHours(entries) {
     const m = this._calculateDayMinutes(entries);
-    return Math.round(m.total / 6) / 10; // arrondi à 0.1h près
+    return Math.round(m.total / 60 * 10) / 10; // arrondi à 0.1h près
   },
 
   // Initialise un calendrier Flatpickr sur un champ date
@@ -1291,10 +1305,19 @@ const App = {
         : new Date(heureStr).toISOString();
 
       // Bloquer si aucune modification réelle (même statut + même heure)
-      if (nouveauStatut === statutActuel && nouvelleHeureISO === heureActuelle) {
-        this.showToast('Aucune modification — ajustez le statut ou l\'heure', 'error');
-        return;
-      }
+if (nouveauStatut === statutActuel && nouvelleHeureISO === heureActuelle) {
+  let errEl = document.getElementById('modErrMsg');
+  if (!errEl) {
+    errEl = document.createElement('div');
+    errEl.id = 'modErrMsg';
+    errEl.style.cssText = 'background:rgba(248,81,73,.15);border:1px solid #f85149;color:#fca5a5;border-radius:8px;padding:12px 16px;font-size:.88rem;font-weight:600;margin-bottom:12px;text-align:center;animation:shake .3s ease';
+    const submitBtn = document.getElementById('modSubmit');
+    submitBtn.parentElement.before(errEl);
+  }
+  errEl.textContent = '⚠️ Aucune modification — ajustez le statut ou l\'heure';
+  this.showToast('Aucune modification — ajustez le statut ou l\'heure', 'error');
+  return;
+}
 
       const btn = document.getElementById('modSubmit');
       btn.disabled = true; btn.textContent = 'Envoi…';
@@ -1349,7 +1372,7 @@ const App = {
         </details>
       ` : '';
 
-      el.innerHTML = this._renderAdmin(this.currentStatuses) + approvalsPlaceholder;
+      el.innerHTML = this._renderAdminHeader(this.currentStatuses) + approvalsPlaceholder;
       this._bindAdminFilters();
 
       // PHASE 2 : charger les approbations en arrière-plan
@@ -1428,7 +1451,22 @@ const App = {
       console.warn('[Admin] refresh failed:', err.message);
     }
   },
-
+_renderAdminHeader(statuses) {
+  const presents = statuses.filter(p =>
+    CONFIG.STATUTS.find(s => s.label === p.StatutActuel)?.category === 'present'
+  );
+  const absents = statuses.filter(p =>
+    CONFIG.STATUTS.find(s => s.label === p.StatutActuel)?.category === 'absent'
+  );
+  return `
+    <div class="admin-wrap">
+      <div class="stat-row">
+        <div class="stat-card green"><div class="stat-n">${presents.length}</div><div class="stat-l">Présents</div></div>
+        <div class="stat-card red">  <div class="stat-n">${absents.length}</div> <div class="stat-l">Absents</div></div>
+        <div class="stat-card blue"> <div class="stat-n">${statuses.length}</div><div class="stat-l">Total</div></div>
+      </div>
+    </div>`;
+},
   _renderAdmin(statuses) {
     const presents = statuses.filter(p =>
       CONFIG.STATUTS.find(s => s.label === p.StatutActuel)?.category === 'present'
@@ -1615,6 +1653,7 @@ const App = {
                       </div>
                     </div>
                     <div class="tv-statut-pill">${p.st.icon} ${p.StatutActuel}</div>
+                    ${p.Notes ? `<div class="tv-note">${p.Notes}</div>` : ''}
                     <div class="tv-time">Depuis ${this._fmtTime(p.HeurePointage)}</div>
                   </div>`;
               }).join('')}
@@ -1842,7 +1881,7 @@ const App = {
       // Résumé global
       const totalEmployes = rows.filter(r => r.total > 0).length;
       const totalJours = rows.reduce((s, r) => s + r.dayStates.filter(x => x.type === 'present').length, 0);
-      const totalHeures = rows.reduce((s, r) => s + r.total, 0);
+      const totalHeures = parseFloat(rows.reduce((s, r) => s + r.total, 0).toFixed(1));
       const totalCongesPris = rows.reduce((s, r) => s + r.hVacPrises + r.hMalPrises, 0);
 
       // Header dates (pour la table)
@@ -1886,8 +1925,8 @@ const App = {
       }).join('');
 
       // Totaux par jour
-      const totByDay = days.map((_, i) => rows.reduce((s, r) => s + r.dayStates[i].hours, 0));
-      const grandTotal = totByDay.reduce((a,b) => a+b, 0);
+      const totByDay = days.map((_, i) => parseFloat(rows.reduce((s, r) => s + r.dayStates[i].hours, 0).toFixed(1)));
+      const grandTotal = Math.round(totByDay.reduce((a,b) => a+b, 0) * 10) / 10;
 
       result.innerHTML = `
         <div class="stat-row" style="margin-bottom:20px">
@@ -1914,7 +1953,7 @@ const App = {
             <tfoot>
               <tr>
                 <td class="emp-col"><strong>TOTAL</strong></td>
-                ${totByDay.map((t, i) => `<td class="day${isWeekend(days[i]) ? ' day-we' : ''}">${t || ''}</td>`).join('')}
+                ${totByDay.map((t, i) => `<td class="day${isWeekend(days[i]) ? ' day-we' : ''}">${t ? (Math.round(t * 10) / 10) : ''}</td>`).join('')}
                 <td class="day tot-cell">${grandTotal} h</td>
                 <td class="day"></td>
                 <td class="day"></td>
