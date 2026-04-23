@@ -344,10 +344,7 @@ document.getElementById('notesInput')?.classList.remove('input-error');
                 <input type="date" id="demDateFin" value="${this._today()}">
               </div>
             </div>
-            <div class="dem-field">
-              <label>Nombre d'heures</label>
-              <input type="number" id="demHeures" min="1" step="0.5" value="8">
-            </div>
+            <div class="dem-field" id="demDurationWrapper"></div>
             <div class="dem-field">
               <label>Motif (optionnel)</label>
               <textarea id="demMotif" maxlength="500" placeholder="Raison de la demande…"></textarea>
@@ -377,6 +374,13 @@ document.getElementById('notesInput')?.classList.remove('input-error');
       `;
 
       document.getElementById('demSubmit').onclick = () => this._submitDemande();
+
+      // Afficher les bons champs selon le type de congé
+      const typeSel = document.getElementById('demType');
+      if (typeSel) {
+        typeSel.onchange = () => this._updateDemandeDurationFields();
+        this._updateDemandeDurationFields();
+      }
 
       // Filtres demandes
       this._allDemandes = { mes: mesDemandes };
@@ -437,16 +441,53 @@ document.getElementById('notesInput')?.classList.remove('input-error');
     }).join('');
   },
 
+  _updateDemandeDurationFields() {
+    const type = document.getElementById('demType')?.value;
+    const wrap = document.getElementById('demDurationWrapper');
+    if (!wrap) return;
+
+    if (type === 'Vacances') {
+      wrap.innerHTML = `
+        <label>Nombre de semaines</label>
+        <input type="number" id="demSemaines" min="0.5" step="0.5" value="1">
+        <small class="muted" style="font-size:.72rem;margin-top:4px;display:block">1 semaine = 40 heures (5 jours × 8 h)</small>
+      `;
+    } else if (type === 'Maladie') {
+      wrap.innerHTML = `
+        <label>Durée</label>
+        <select id="demDuree">
+          <option value="4">½ Demi-journée (4 h)</option>
+          <option value="8" selected>🗓️ Journée complète (8 h)</option>
+        </select>
+      `;
+    } else {
+      wrap.innerHTML = `
+        <label>Nombre d'heures</label>
+        <input type="number" id="demHeures" min="1" step="0.5" value="8">
+      `;
+    }
+  },
+
   async _submitDemande() {
     const type = document.getElementById('demType').value;
     const dateDebut = document.getElementById('demDateDebut').value;
     const dateFin = document.getElementById('demDateFin').value;
-    const heures = parseFloat(document.getElementById('demHeures').value) || 0;
     const motif = document.getElementById('demMotif').value.trim();
+
+    // Calcul des heures selon le type de demande
+    let heures = 0;
+    if (type === 'Vacances') {
+      const semaines = parseFloat(document.getElementById('demSemaines')?.value) || 0;
+      heures = semaines * 40;
+    } else if (type === 'Maladie') {
+      heures = parseFloat(document.getElementById('demDuree')?.value) || 0;
+    } else {
+      heures = parseFloat(document.getElementById('demHeures')?.value) || 0;
+    }
 
     if (!dateDebut || !dateFin) return this.showToast('Dates requises', 'error');
     if (new Date(dateFin) < new Date(dateDebut)) return this.showToast('Date fin avant date début', 'error');
-    if (heures <= 0) return this.showToast('Nombre d\'heures invalide', 'error');
+    if (heures <= 0) return this.showToast('Durée invalide', 'error');
 
     const btn = document.getElementById('demSubmit');
     btn.disabled = true; btn.textContent = 'Envoi…';
