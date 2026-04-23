@@ -711,7 +711,7 @@ document.getElementById('notesInput')?.classList.remove('input-error');
                 <th style="text-align:center" title="Voir l'affichage TV">📺 TV</th>
                 <th style="text-align:center" title="Voir le rapport paye">💰 Paye</th>
                 <th style="text-align:center" title="Gérer les utilisateurs">🔑 Accès</th>
-                <th style="text-align:center" title="Approuver demandes de congé">✓ Congés</th>
+                <th style="text-align:center" title="Accès à l'onglet Approbations (approuver demandes de congé + modifications de pointages)">✅ Approb.</th>
                 <th style="text-align:center" title="Solde vacances en semaines">🌴 Vac. (sem)</th>
                 <th style="text-align:center" title="Solde maladie en jours">🤒 Mal. (j)</th>
                 <th>Action</th>
