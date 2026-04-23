@@ -1558,7 +1558,7 @@ _renderAdminHeader(statuses) {
         <div class="table-wrap">
           <table id="adminTable">
             <thead>
-              <tr><th>Employé</th><th>Département</th><th>Statut actuel</th><th>Depuis</th><th>Note</th></tr>
+              <tr><th>Employé</th><th>Département</th><th>Statut actuel</th><th>Depuis</th><th>Note</th><th>Actions</th></tr>
             </thead>
             <tbody>
               ${statuses.map(p => this._renderAdminRow(p)).join('')}
@@ -1572,6 +1572,7 @@ _renderAdminHeader(statuses) {
     const st    = CONFIG.STATUTS.find(s => s.label === p.StatutActuel);
     const color = st?.color || '#6c757d';
     const cat   = st?.category || '';
+    const canChange = this.perms?.canAdmin;
     return `
       <tr class="admin-row" data-email="${p.EmployeEmail}" data-dept="${p.Departement || ''}" data-cat="${cat}">
         <td><strong>${p.EmployeNom || '—'}</strong><br><small class="muted">${p.EmployeEmail}</small></td>
@@ -1579,6 +1580,7 @@ _renderAdminHeader(statuses) {
         <td><span class="badge" style="background:${color}">${st?.icon || ''} ${p.StatutActuel}</span></td>
         <td>${this._fmtDateTime(p.HeurePointage)}</td>
         <td class="muted">${p.Notes || ''}</td>
+        <td>${canChange ? `<button class="btn-secondary change-status-btn" data-email="${p.EmployeEmail}" data-nom="${(p.EmployeNom || '').replace(/"/g, '&quot;')}" data-dept="${p.Departement || ''}" data-statut="${p.StatutActuel || ''}" style="padding:6px 10px;font-size:.78rem;white-space:nowrap">✏️ Changer</button>` : ''}</td>
       </tr>`;
   },
 
@@ -1599,6 +1601,87 @@ _renderAdminHeader(statuses) {
     document.getElementById('searchInput')?.addEventListener('input',  run);
     document.getElementById('deptFilter')?.addEventListener('change', run);
     document.getElementById('catFilter')?.addEventListener('change',  run);
+
+    // Boutons "Changer statut" par employé
+    document.querySelectorAll('.change-status-btn').forEach(btn => {
+      btn.onclick = () => this._openChangeStatutModal({
+        email:  btn.dataset.email,
+        nom:    btn.dataset.nom,
+        dept:   btn.dataset.dept,
+        statut: btn.dataset.statut,
+      });
+    });
+  },
+
+  _openChangeStatutModal(emp) {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px';
+    overlay.innerHTML = `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;max-width:500px;width:100%">
+        <h3 style="margin-bottom:16px;color:var(--text);text-transform:none;letter-spacing:0;font-size:1.1rem">✏️ Changer le statut de ${emp.nom}</h3>
+        <p class="muted" style="margin-bottom:18px;font-size:.85rem">Le changement est enregistré immédiatement avec votre email (${this.user.email}) comme responsable.</p>
+
+        <div style="margin-bottom:14px">
+          <label style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;display:block;margin-bottom:6px">Employé</label>
+          <div style="padding:10px 14px;background:var(--surface-2);border-radius:8px;font-size:.9rem"><strong>${emp.nom}</strong> · <span class="muted">${emp.email}</span> · ${emp.dept || '—'}</div>
+        </div>
+
+        <div style="margin-bottom:14px">
+          <label style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;display:block;margin-bottom:6px">Nouveau statut</label>
+          <select id="chgStatut" style="width:100%;padding:10px 14px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:.9rem">
+            ${CONFIG.STATUTS.map(s => `<option value="${s.label}" ${s.label === emp.statut ? 'selected' : ''}>${s.icon} ${s.label}</option>`).join('')}
+          </select>
+        </div>
+
+        <div style="margin-bottom:18px">
+          <label style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;display:block;margin-bottom:6px">Note (optionnelle)</label>
+          <textarea id="chgNote" placeholder="Raison du changement, client, contexte…" maxlength="200" style="width:100%;padding:10px 14px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:.9rem;resize:vertical;min-height:60px"></textarea>
+          <div id="chgNoteErr" style="margin-top:6px;font-size:.78rem;color:var(--danger);display:none">⚠️ Note obligatoire pour un statut "sur la route"</div>
+        </div>
+
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button class="btn-secondary" id="chgCancel">Annuler</button>
+          <button class="btn-primary" id="chgSubmit">💾 Enregistrer</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const close = () => overlay.remove();
+    document.getElementById('chgCancel').onclick = close;
+    overlay.onclick = (e) => { if (e.target === overlay) close(); };
+
+    document.getElementById('chgSubmit').onclick = async () => {
+      const statut = document.getElementById('chgStatut').value;
+      const note   = document.getElementById('chgNote').value.trim();
+      const statCfg = CONFIG.STATUTS.find(s => s.label === statut);
+      const needsNote = statCfg && (statCfg.id === 'route_bip' || statCfg.id === 'route_cv247');
+
+      if (needsNote && !note) {
+        document.getElementById('chgNoteErr').style.display = 'block';
+        document.getElementById('chgNote').focus();
+        return;
+      }
+
+      const btn = document.getElementById('chgSubmit');
+      btn.disabled = true; btn.textContent = 'Envoi…';
+      try {
+        await Graph.pointage({
+          nom:         emp.nom,
+          email:       emp.email,
+          departement: emp.dept || '',
+          statut,
+          notes:       note ? `${note} (modifié par admin ${this.user.email})` : `(modifié par admin ${this.user.email})`,
+        });
+        this.showToast(`Statut de ${emp.nom} mis à jour`, 'success');
+        close();
+        await this._loadAdmin();
+      } catch (err) {
+        btn.disabled = false; btn.textContent = '💾 Enregistrer';
+        this.showToast('Erreur : ' + err.message, 'error');
+      }
+    };
   },
 
   exportCSV() {
